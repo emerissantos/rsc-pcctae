@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from decimal import Decimal
+from pathlib import Path
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -9,6 +10,7 @@ from django.db import models, transaction
 from django.db.models import Sum
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.text import slugify
 
 from apps.core.models import AuditModel, UUIDPublicModel
 
@@ -260,13 +262,60 @@ class LancamentoItem(UUIDPublicModel, AuditModel):
         return result
 
 
+def _segmento_caminho(valor, padrao: str) -> str:
+    segmento = slugify(str(valor or "").replace(".", "-"), allow_unicode=False).strip("-")
+    return segmento[:80] or padrao
+
+
+def _numero_requerimento_seguro(requerimento: Requerimento) -> str:
+    """Retorna o número público do requerimento como segmento seguro de diretório.
+
+    O número é único no banco (por exemplo, ``RSC-2026-000001``), portanto
+    identifica de forma estável a pasta do processo sem expor SIAPE, CPF ou
+    outros dados funcionais no caminho físico.
+    """
+    numero = str(requerimento.numero or "").strip().upper()
+    seguro = "".join(caractere for caractere in numero if caractere.isalnum() or caractere in "-_")
+    return seguro[:80] or f"REQUERIMENTO-{requerimento.uuid.hex}"
+
+
+def documento_lancamento_upload_to(instance, filename: str) -> str:
+    """Organiza comprovantes por requerimento, requisito e item.
+
+    Estrutura:
+    ``requerimentos/RSC-2026-000001/requisito-IV/item-IV-2/<uuid>-arquivo.pdf``.
+
+    O número do requerimento é único e o UUID do documento impede colisões,
+    inclusive quando usuários enviam arquivos com o mesmo nome original.
+    """
+    lancamento = instance.lancamento
+    requerimento = lancamento.requerimento
+    caminho_original = Path(filename)
+    extensao = caminho_original.suffix.lower()[:15]
+    nome_base = _segmento_caminho(caminho_original.stem, "documento")
+    nome_armazenado = f"{instance.uuid.hex}-{nome_base}{extensao}"
+
+    return "/".join(
+        [
+            "requerimentos",
+            _numero_requerimento_seguro(requerimento),
+            f"requisito-{_segmento_caminho(lancamento.item.requisito.codigo, 'sem-requisito')}",
+            f"item-{_segmento_caminho(lancamento.item.codigo, 'sem-item')}",
+            nome_armazenado,
+        ]
+    )
+
+
 class DocumentoLancamento(UUIDPublicModel, AuditModel):
     lancamento = models.ForeignKey(
         LancamentoItem,
         on_delete=models.CASCADE,
         related_name="documentos",
     )
-    arquivo = models.FileField(upload_to="requerimentos/%Y/%m/%d/")
+    arquivo = models.FileField(
+        upload_to=documento_lancamento_upload_to,
+        max_length=500,
+    )
     nome_original = models.CharField(max_length=255)
     tipo_mime = models.CharField(max_length=150, blank=True)
     tamanho_bytes = models.PositiveBigIntegerField(default=0)
@@ -298,6 +347,14 @@ class DocumentoLancamento(UUIDPublicModel, AuditModel):
             except (AttributeError, OSError):
                 pass
         return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        nome_arquivo = self.arquivo.name if self.arquivo else ""
+        storage = self.arquivo.storage if self.arquivo else None
+        resultado = super().delete(*args, **kwargs)
+        if nome_arquivo and storage:
+            transaction.on_commit(lambda: storage.delete(nome_arquivo))
+        return resultado
 
 
 class HistoricoRequerimento(UUIDPublicModel, AuditModel):

@@ -1,5 +1,3 @@
-from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
@@ -11,8 +9,9 @@ urlpatterns = [
     path("requerimentos/", include("apps.requerimentos.urls")),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Arquivos enviados pelos usuários são privados. Eles nunca são expostos por
+# MEDIA_URL, nem mesmo em desenvolvimento. O acesso ocorre exclusivamente por
+# views autenticadas do app requerimentos.
 
 handler403 = "apps.core.views.error_403"
 handler404 = "apps.core.views.error_404"

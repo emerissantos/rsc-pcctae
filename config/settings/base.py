@@ -100,8 +100,22 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-MEDIA_URL = "/media/"
+# MEDIA_ROOT guarda documentos privados. MEDIA_URL existe apenas por exigência
+# de compatibilidade do storage; nenhuma rota pública é registrada para esse
+# prefixo. Downloads passam por autorização do Django.
+MEDIA_URL = "/_private_files_not_public_/"
 MEDIA_ROOT = Path(get_env("RSC_MEDIA_ROOT", str(BASE_DIR / "media")))
+RSC_USE_X_ACCEL_REDIRECT = get_bool("RSC_USE_X_ACCEL_REDIRECT", False)
+RSC_PROTECTED_MEDIA_INTERNAL_URL = get_env(
+    "RSC_PROTECTED_MEDIA_INTERNAL_URL", "/_protected_media/"
+)
+
+STORAGES = {
+    "default": {"BACKEND": "apps.core.storage.PrivateFileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+    },
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

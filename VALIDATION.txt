@@ -1,12 +1,39 @@
-RSC-PCCTAE 0.4.0 — RELATÓRIO DE VALIDAÇÃO
+RSC-PCCTAE 0.4.2 — RELATÓRIO DE VALIDAÇÃO
 
 Arquitetura:
 - Sem ciclos de avaliação.
 - Sem módulo de normas ou versões normativas.
 - Requisitos e itens operacionais.
 - Cálculo por item e quantidade.
-- Anexos e observação opcional.
+- Um ou vários anexos no mesmo item.
 - Snapshots das regras nos lançamentos.
+
+Arquivos privados:
+- MEDIA_ROOT não possui rota pública, nem em DEBUG.
+- Storage não gera URL pública para FileField.
+- Acesso somente por endpoint autenticado e autorizado.
+- Requerente, equipe administrativa e membros ativos da comissão podem consultar.
+- Produção usa localização Nginx internal após autorização Django.
+- Respostas de download não permitem cache público e forçam download.
+
+Estrutura física dos arquivos:
+- requerimentos/<numero>/requisito-<codigo>/item-<codigo>/<uuid>-<nome-seguro>.<ext>
+- Exemplo: requerimentos/RSC-2026-000001/requisito-iv/item-iv-2/uuid-documento.pdf
+- O número do requerimento é único no banco.
+- O UUID no nome físico impede colisões, mesmo com nomes originais repetidos.
+- SIAPE e CPF não são expostos no caminho físico.
+
+Quantidade:
+- Itens inteiros bloqueiam frações no frontend.
+- A mesma regra é validada novamente no backend e no model.
+- Teste com quantidade 1.01 rejeitado corretamente.
+
+Upload:
+- Um lançamento aceita múltiplos comprovantes.
+- Um único comprovante pode justificar várias unidades declaradas.
+- Extensão, MIME e tamanho são validados no backend.
+- Nome original, MIME, tamanho e SHA-256 são persistidos.
+- Exclusão do registro remove o arquivo físico após commit.
 
 Seed:
 - 6 requisitos.
@@ -16,11 +43,10 @@ Seed:
 - Idempotência verificada.
 
 Validações executadas:
-- pytest: 23 testes aprovados.
+- pytest: 31 testes aprovados.
 - django check: sem problemas.
 - makemigrations --check --dry-run: nenhuma alteração pendente.
 - ruff check: aprovado.
-- compilação dos templates principais: aprovada.
 
 Observação:
 - Os testes automatizados usam SQLite em memória.

@@ -1,4 +1,4 @@
-# Instalação limpa — RSC-PCCTAE 0.4.0
+# Instalação limpa — RSC-PCCTAE 0.4.2
 
 ## 1. Remover o ambiente anterior
 
@@ -15,8 +15,8 @@ Depois, remova a pasta antiga e extraia o novo pacote.
 ## 2. Preparar o novo projeto
 
 ```bash
-unzip rsc-pcctae-v0.4.0.zip
-cd rsc-pcctae-v0.4.0/rsc-pcctae
+unzip rsc-pcctae-v0.4.2.zip
+cd rsc-pcctae-v0.4.2/rsc-pcctae
 cp .env.example .env
 ```
 
@@ -86,3 +86,9 @@ docker compose exec web python manage.py seed_rsc
 docker compose exec web pytest
 docker compose exec web ruff check .
 ```
+
+## 7. Arquivos privados
+
+Em desenvolvimento, os arquivos são entregues pelo Django somente após autenticação. Em produção, `compose.prod.yaml` ativa automaticamente o `X-Accel-Redirect`, e o Nginx lê o volume por uma localização `internal`.
+
+Não crie `location /media/` no proxy e não use `static(settings.MEDIA_URL, ...)` nas URLs do Django. O projeto já está configurado para impedir acesso direto.

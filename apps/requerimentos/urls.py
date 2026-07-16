@@ -12,6 +12,11 @@ urlpatterns = [
     path("<uuid:uuid>/itens/<uuid:item_uuid>/salvar/", views.salvar_item, name="salvar-item"),
     path("<uuid:uuid>/itens/<uuid:item_uuid>/remover/", views.remover_item, name="remover-item"),
     path(
+        "<uuid:uuid>/documentos/<uuid:documento_uuid>/baixar/",
+        views.baixar_documento,
+        name="baixar-documento",
+    ),
+    path(
         "<uuid:uuid>/documentos/<uuid:documento_uuid>/remover/",
         views.remover_documento,
         name="remover-documento",

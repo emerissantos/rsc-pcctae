@@ -30,6 +30,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      RSC_USE_X_ACCEL_REDIRECT: "true"
+      RSC_PROTECTED_MEDIA_INTERNAL_URL: "/_protected_media/"
     volumes:
       - media_data:/app/media
       - static_data:/app/staticfiles

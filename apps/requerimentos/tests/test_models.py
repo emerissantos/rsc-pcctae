@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from apps.contas.models import Usuario
@@ -79,3 +80,47 @@ def test_submissao_com_anexo(dados_basicos):
     requerimento.refresh_from_db()
     assert requerimento.situacao == Requerimento.Situacao.SUBMETIDO
     assert requerimento.submetido_em is not None
+
+
+@pytest.mark.django_db
+def test_documento_usa_estrutura_padrao_de_diretorios(dados_basicos, tmp_path, settings):
+    settings.MEDIA_ROOT = tmp_path
+    usuario, requerimento, item = dados_basicos
+    lancamento = LancamentoItem.objects.create(
+        requerimento=requerimento,
+        item=item,
+        quantidade_declarada=2,
+        created_by=usuario,
+        updated_by=usuario,
+    )
+    documento = DocumentoLancamento.objects.create(
+        lancamento=lancamento,
+        arquivo=SimpleUploadedFile(
+            "Declaração Projeto Final.pdf",
+            b"arquivo",
+            content_type="application/pdf",
+        ),
+        nome_original="Declaração Projeto Final.pdf",
+        created_by=usuario,
+        updated_by=usuario,
+    )
+
+    caminho = documento.arquivo.name
+    assert caminho.startswith(f"requerimentos/{requerimento.numero}/")
+    assert "/requisito-iv/item-iv-2/" in caminho
+    assert caminho.endswith("-declaracao-projeto-final.pdf")
+    assert "siape-1234567" not in caminho
+
+
+@pytest.mark.django_db
+def test_item_inteiro_rejeita_quantidade_fracionada(dados_basicos):
+    usuario, requerimento, item = dados_basicos
+    with pytest.raises(ValidationError) as erro:
+        LancamentoItem.objects.create(
+            requerimento=requerimento,
+            item=item,
+            quantidade_declarada=Decimal("1.01"),
+            created_by=usuario,
+            updated_by=usuario,
+        )
+    assert "somente quantidade inteira" in str(erro.value)

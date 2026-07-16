@@ -1,6 +1,6 @@
 # Sistema RSC-PCCTAE — UFSB
 
-Versão **0.4.0**, reconstruída para instalação limpa.
+Versão **0.4.2**, com upload funcional e documentos privados.
 
 ## Escopo desta versão
 
@@ -43,6 +43,41 @@ Nos quatro itens do requisito V, as condições de titular e substituto foram tr
 - `V.1-T` — CD-02 como titular;
 - `V.1-S` — CD-02 como substituto.
 
+
+## Comprovantes e privacidade
+
+Cada item possui um único lançamento de quantidade e pode receber **um ou vários comprovantes**:
+
+- use um arquivo quando ele comprovar toda a quantidade declarada;
+- use vários arquivos quando a comprovação estiver dividida entre documentos;
+- a comissão avalia o conjunto de anexos do item contra a quantidade informada.
+
+Os arquivos são armazenados internamente no padrão:
+
+```text
+requerimentos/
+└── siape-<SIAPE>/
+    └── <AAAAMMDD>/
+        └── <NUMERO-DO-REQUERIMENTO>/
+            └── requisito-<CODIGO>/
+                └── item-<CODIGO>/
+                    └── <UUID>_<nome-normalizado>.<extensão>
+```
+
+Não existe acesso direto por `/media/` ou por URL do storage. O usuário clica no documento dentro do sistema; a aplicação verifica sessão e permissão antes de entregar o conteúdo. Em produção, o Nginx usa uma localização `internal`, inacessível diretamente pela internet.
+
+Podem consultar um comprovante:
+
+- o requerente proprietário do pedido;
+- usuários administrativos;
+- membros ativos da comissão associada ao requerimento.
+
+Membros da comissão podem consultar, mas não editar os itens declarados pelo servidor.
+
+## Validação da quantidade
+
+Itens configurados como inteiros aceitam somente `1`, `2`, `3` etc. A interface bloqueia separadores decimais, inclusive no Firefox, e o backend repete a validação. Portanto, valores como `1.01` ou `1,5` são rejeitados mesmo que o navegador tente enviá-los.
+
 ## Requisitos técnicos
 
 - Docker 24 ou superior;
@@ -56,8 +91,8 @@ Nos quatro itens do requisito V, as condições de titular e substituto foram tr
 ### 1. Extraia o projeto
 
 ```bash
-unzip rsc-pcctae-v0.4.0.zip
-cd rsc-pcctae-v0.4.0/rsc-pcctae
+unzip rsc-pcctae-v0.4.2.zip
+cd rsc-pcctae-v0.4.2/rsc-pcctae
 ```
 
 ### 2. Crie o `.env`

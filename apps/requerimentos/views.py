@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
+from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.http import content_disposition_header
 from django.views.decorators.http import require_POST
 
 from apps.pontuacao.models import ItemPontuacao, Requisito
@@ -16,13 +19,31 @@ from apps.pontuacao.models import ItemPontuacao, Requisito
 from .forms import RequerimentoForm, limpar_quantidade
 from .models import DocumentoLancamento, LancamentoItem, Requerimento
 
+logger = logging.getLogger(__name__)
+
 
 def _requerimento_do_usuario(request, uuid, *, editavel=False) -> Requerimento:
     queryset = Requerimento.objects.select_related(
         "requerente", "vinculo", "vinculo__servidor", "nivel_pretendido", "comissao"
     )
     requerimento = get_object_or_404(queryset, uuid=uuid)
-    if not request.user.is_staff and requerimento.requerente_id != request.user.id:
+
+    eh_requerente = requerimento.requerente_id == request.user.id
+    eh_membro_comissao = bool(
+        requerimento.comissao_id
+        and request.user.participacoes_comissoes.filter(
+            comissao_id=requerimento.comissao_id,
+            ativo=True,
+        ).exists()
+    )
+    pode_visualizar = request.user.is_staff or eh_requerente or eh_membro_comissao
+    if not pode_visualizar:
+        raise PermissionDenied
+
+    # Membros da comissão podem consultar documentos, mas não alterar o
+    # preenchimento do servidor. A edição continua restrita ao requerente e à
+    # administração, sempre enquanto o requerimento estiver editável.
+    if editavel and not (request.user.is_staff or eh_requerente):
         raise PermissionDenied
     if editavel and not requerimento.pode_editar:
         raise PermissionDenied("O requerimento não está disponível para edição.")
@@ -104,9 +125,25 @@ def itens(request, uuid):
 def salvar_item(request, uuid, item_uuid):
     requerimento = _requerimento_do_usuario(request, uuid, editavel=True)
     item = get_object_or_404(ItemPontuacao, uuid=item_uuid, ativo=True)
+    lancamento_existente = LancamentoItem.objects.filter(
+        requerimento=requerimento,
+        item=item,
+    ).prefetch_related("documentos").first()
+    uploads = request.FILES.getlist("documentos")
+
     try:
         quantidade = limpar_quantidade(request.POST.get("quantidade", ""))
         item.calcular(quantidade)
+        for upload in uploads:
+            _validar_upload(upload)
+        possui_documento = bool(uploads) or bool(
+            lancamento_existente
+            and lancamento_existente.documentos.filter(ativo=True).exists()
+        )
+        if item.exige_anexo and not possui_documento:
+            raise ValidationError(
+                "Selecione ao menos um comprovante para salvar este item."
+            )
     except ValidationError as exc:
         mensagem = exc.messages[0]
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
@@ -130,21 +167,16 @@ def salvar_item(request, uuid, item_uuid):
         lancamento.updated_by = request.user
         lancamento.save()
 
-    erros_upload = []
-    for upload in request.FILES.getlist("documentos"):
-        try:
-            _validar_upload(upload)
-            DocumentoLancamento.objects.create(
-                lancamento=lancamento,
-                arquivo=upload,
-                nome_original=upload.name,
-                tipo_mime=getattr(upload, "content_type", "") or "",
-                tamanho_bytes=upload.size,
-                created_by=request.user,
-                updated_by=request.user,
-            )
-        except ValidationError as exc:
-            erros_upload.extend(exc.messages)
+    for upload in uploads:
+        DocumentoLancamento.objects.create(
+            lancamento=lancamento,
+            arquivo=upload,
+            nome_original=upload.name,
+            tipo_mime=getattr(upload, "content_type", "") or "",
+            tamanho_bytes=upload.size,
+            created_by=request.user,
+            updated_by=request.user,
+        )
 
     requerimento.refresh_from_db(fields=["pontuacao_declarada"])
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
@@ -154,12 +186,10 @@ def salvar_item(request, uuid, item_uuid):
                 "pontuacao_item": f"{lancamento.pontuacao_declarada:.2f}",
                 "pontuacao_total": f"{requerimento.pontuacao_declarada:.2f}",
                 "documentos": lancamento.documentos.filter(ativo=True).count(),
-                "avisos": erros_upload,
+                "avisos": [],
             }
         )
     messages.success(request, f"Item {item.codigo} salvo.")
-    for erro in erros_upload:
-        messages.warning(request, erro)
     return redirect("requerimentos:itens", uuid=requerimento.uuid)
 
 
@@ -176,6 +206,55 @@ def remover_item(request, uuid, item_uuid):
     lancamento.delete()
     messages.success(request, f"Item {codigo} removido.")
     return redirect("requerimentos:itens", uuid=requerimento.uuid)
+
+
+@login_required
+def baixar_documento(request, uuid, documento_uuid):
+    """Entrega um comprovante somente após autenticação e autorização.
+
+    Não existe rota pública para MEDIA_ROOT e não há redirecionamento para uma
+    URL do arquivo. Em produção, o Django autoriza e o Nginx entrega o conteúdo
+    por uma localização ``internal``. Em desenvolvimento, o Django faz o
+    streaming diretamente.
+    """
+
+    requerimento = _requerimento_do_usuario(request, uuid)
+    documento = get_object_or_404(
+        DocumentoLancamento,
+        uuid=documento_uuid,
+        ativo=True,
+        lancamento__requerimento=requerimento,
+    )
+
+    content_type = documento.tipo_mime or "application/octet-stream"
+    if settings.RSC_USE_X_ACCEL_REDIRECT:
+        resposta = HttpResponse(content_type=content_type)
+        prefixo = settings.RSC_PROTECTED_MEDIA_INTERNAL_URL.rstrip("/")
+        caminho = quote(documento.arquivo.name.lstrip("/"), safe="/")
+        resposta["X-Accel-Redirect"] = f"{prefixo}/{caminho}"
+    else:
+        resposta = FileResponse(
+            documento.arquivo.open("rb"),
+            content_type=content_type,
+        )
+
+    resposta["Content-Disposition"] = content_disposition_header(
+        True, documento.nome_original
+    )
+    resposta["X-Content-Type-Options"] = "nosniff"
+    resposta["Cache-Control"] = "private, no-store, no-cache, max-age=0"
+    resposta["Pragma"] = "no-cache"
+    resposta["Expires"] = "0"
+
+    logger.info(
+        "documento_requerimento_acessado",
+        extra={
+            "documento_uuid": str(documento.uuid),
+            "requerimento_uuid": str(requerimento.uuid),
+            "usuario_id": request.user.pk,
+        },
+    )
+    return resposta
 
 
 @login_required

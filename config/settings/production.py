@@ -21,3 +21,6 @@ SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "same-origin"
+
+# O Nginx entrega o arquivo somente após autorização da view Django.
+RSC_USE_X_ACCEL_REDIRECT = get_bool("RSC_USE_X_ACCEL_REDIRECT", True)

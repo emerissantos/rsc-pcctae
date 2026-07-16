@@ -108,3 +108,34 @@ class ProvisionarUsuarioUFSBService:
         if not Usuario.objects.filter(username=candidate).exists():
             return candidate
         return f"ufsb-{id_usuario}"
+
+
+class ImportarUsuarioSIGService(ProvisionarUsuarioUFSBService):
+    """Importa ou atualiza uma conta sem exigir que a pessoa realize login."""
+
+    def execute(
+        self,
+        *,
+        id_usuario: int | None = None,
+        login: str | None = None,
+        id_institucional: int | None = None,
+        correlation_id: str = "",
+    ) -> ProvisionResult:
+        usuario_api = self.usuarios_service.get_by_identifier(
+            id_usuario=id_usuario,
+            login=login,
+            id_institucional=id_institucional,
+        )
+        servidores_api = self.servidores_service.list_by_id_institucional(
+            usuario_api.id_institucional
+        )
+        sync_result = PersistirCadastroInstitucionalService.execute(
+            usuario_api=usuario_api,
+            servidores_api=servidores_api,
+            correlation_id=correlation_id,
+        )
+        return self._persist_account(
+            usuario_api=usuario_api,
+            pessoa=sync_result.pessoa,
+            vinculos_count=len(sync_result.vinculos),
+        )

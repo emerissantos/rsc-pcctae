@@ -93,6 +93,12 @@ class TriagemRequerimento(UUIDPublicModel, AuditModel):
         verbose_name = "triagem de requerimento"
         verbose_name_plural = "triagens de requerimentos"
         ordering = ["-iniciada_em"]
+        permissions = [
+            ("acessar_fila_triagem", "Pode acessar a fila de triagem"),
+            ("iniciar_triagem", "Pode iniciar triagem de requerimento"),
+            ("alterar_triagem", "Pode alterar triagem de requerimento"),
+            ("concluir_triagem", "Pode concluir triagem de requerimento"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["requerimento", "rodada"],
@@ -181,9 +187,7 @@ class VerificacaoChecklistTriagem(UUIDPublicModel, AuditModel):
     def clean(self) -> None:
         super().clean()
         if self.situacao == self.Situacao.NAO_CONFORME and not self.observacao.strip():
-            raise ValidationError(
-                {"observacao": "Descreva a pendência identificada neste item."}
-            )
+            raise ValidationError({"observacao": "Descreva a pendência identificada neste item."})
 
     def save(self, *args, **kwargs):
         if self.item_id and not self.item_codigo_snapshot:

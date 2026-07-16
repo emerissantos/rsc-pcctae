@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Importar usuário do SIG | Cadastros{% endblock %}
+{% block page_title %}Importar usuário do SIG{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="Navegação estrutural">
+  <a href="{% url 'cadastros:central' %}">Cadastros</a><span>›</span>
+  <a href="{% url 'cadastros:area' area.slug %}">{{ area.title }}</a><span>›</span>
+  <a href="{% url 'cadastros:lista' 'usuarios' %}">Usuários</a><span>›</span>
+  <strong>Importar do SIG</strong>
+</nav>
+<div class="page-heading">
+  <div>
+    <span class="eyebrow orange">Fonte institucional oficial</span>
+    <h1>Importar usuário do SIG</h1>
+    <p>Consulte uma conta institucional e sincronize a pessoa, o servidor, os vínculos funcionais e o usuário local.</p>
+  </div>
+</div>
+<form method="post" class="cadastro-form import-user-form" novalidate>
+  {% csrf_token %}
+  <section class="card form-section-card">
+    <div class="section-heading"><div><span class="step-index">1</span><div><strong>Identificar a pessoa</strong><small>Prefira o login institucional ou o ID do usuário, que identificam uma conta específica.</small></div></div></div>
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="form-section-grid">
+      {% for field in form %}
+      <div class="form-group {% if field.name == 'valor' %}span-full{% endif %}">
+        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-mark">*</span>{% endif %}</label>
+        {{ field }}
+        {% if field.help_text %}<small class="help-text">{{ field.help_text }}</small>{% endif %}
+        {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="card info-card compact-info-card">
+    <strong>O que será sincronizado</strong>
+    <p>A importação cria ou atualiza a conta local com senha inutilizável. O acesso continuará ocorrendo exclusivamente pelo OAuth institucional.</p>
+    <ul class="compact-list"><li>Pessoa institucional</li><li>Cadastro de servidor</li><li>Todos os vínculos funcionais retornados</li><li>Identidade externa e conta local</li></ul>
+  </section>
+  <div class="sticky-form-actions">
+    <a class="button button-ghost" href="{% url 'cadastros:lista' 'usuarios' %}">Cancelar</a>
+    <button class="button button-primary" type="submit">Consultar e importar</button>
+  </div>
+</form>
+{% endblock %}

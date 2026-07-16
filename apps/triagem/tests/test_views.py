@@ -243,6 +243,7 @@ def test_correcao_resubmetida_preserva_situacao_anterior_e_comissao(db):
     assert historico.situacao_anterior == Requerimento.Situacao.PENDENTE_CORRECAO
     assert "Correções submetidas" in historico.descricao
 
+
 @pytest.mark.django_db
 def test_submissao_associa_comissao_vigente_automaticamente(db):
     hoje = timezone.localdate()
@@ -302,3 +303,96 @@ def test_mandato_encerrado_nao_autoriza_fila(client, contexto_triagem):
     resposta = client.get(reverse("triagem:fila"))
 
     assert resposta.status_code == 403
+
+
+@pytest.mark.django_db
+def test_staff_com_participacao_inativa_nao_ve_menu_nem_fila(client, contexto_triagem):
+    from django.test import RequestFactory
+
+    from apps.triagem.context_processors import permissoes_triagem
+
+    membro = contexto_triagem["membro"]
+    membro.is_staff = True
+    membro.save(update_fields=["is_staff"])
+    participacao = membro.participacoes_comissoes.get(comissao=contexto_triagem["comissao"])
+    participacao.ativo = False
+    participacao.save(update_fields=["ativo", "updated_at"])
+
+    request = RequestFactory().get("/")
+    request.user = membro
+    assert permissoes_triagem(request)["pode_acessar_triagem"] is False
+
+    client.force_login(membro)
+    assert client.get(reverse("triagem:fila")).status_code == 403
+
+
+@pytest.mark.django_db
+def test_staff_inativo_nao_acessa_triagem_nem_requerimento_por_url(client, contexto_triagem):
+    membro = contexto_triagem["membro"]
+    requerimento = contexto_triagem["requerimento"]
+    client.force_login(membro)
+    client.post(reverse("triagem:iniciar", args=[requerimento.uuid]))
+    triagem = TriagemRequerimento.objects.get(requerimento=requerimento)
+
+    membro.is_staff = True
+    membro.save(update_fields=["is_staff"])
+    participacao = membro.participacoes_comissoes.get(comissao=contexto_triagem["comissao"])
+    participacao.ativo = False
+    participacao.save(update_fields=["ativo", "updated_at"])
+
+    assert client.get(reverse("triagem:detalhe", args=[triagem.uuid])).status_code == 403
+    assert client.get(reverse("requerimentos:detalhe", args=[requerimento.uuid])).status_code == 403
+
+
+@pytest.mark.django_db
+def test_gestao_de_triagem_nao_concede_operacao(client, contexto_triagem):
+    from django.contrib.auth.models import Group
+
+    from apps.cadastros.permissions import seed_groups
+
+    seed_groups()
+    gestor = Usuario.objects.create_user(username="gestor-checklist", password="teste")
+    gestor.groups.add(Group.objects.get(name="Gestão de Triagem"))
+    client.force_login(gestor)
+
+    assert client.get(reverse("triagem:fila")).status_code == 403
+
+
+@pytest.mark.django_db
+def test_operacao_de_triagem_concede_acesso_explicito(client, contexto_triagem):
+    from django.contrib.auth.models import Group
+
+    from apps.cadastros.permissions import seed_groups
+
+    seed_groups()
+    operador = Usuario.objects.create_user(username="operador-triagem", password="teste")
+    operador.groups.add(Group.objects.get(name="Operação de Triagem"))
+    client.force_login(operador)
+
+    assert client.get(reverse("triagem:fila")).status_code == 200
+    resposta = client.post(reverse("triagem:iniciar", args=[contexto_triagem["requerimento"].uuid]))
+    assert resposta.status_code == 302
+    assert TriagemRequerimento.objects.filter(
+        requerimento=contexto_triagem["requerimento"], responsavel=operador
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_permissao_de_fila_sozinha_nao_permite_iniciar(client, contexto_triagem):
+    from django.contrib.auth.models import Permission
+
+    operador = Usuario.objects.create_user(username="consulta-triagem", password="teste")
+    operador.user_permissions.add(
+        Permission.objects.get(
+            content_type__app_label="triagem",
+            codename="acessar_fila_triagem",
+        )
+    )
+    client.force_login(operador)
+
+    assert client.get(reverse("triagem:fila")).status_code == 200
+    resposta = client.post(reverse("triagem:iniciar", args=[contexto_triagem["requerimento"].uuid]))
+    assert resposta.status_code == 403
+    assert not TriagemRequerimento.objects.filter(
+        requerimento=contexto_triagem["requerimento"]
+    ).exists()

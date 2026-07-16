@@ -9,16 +9,24 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login as django_login
 from django.contrib.auth import logout as django_logout
-from django.shortcuts import redirect, render
+from django.core.exceptions import PermissionDenied
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from apps.auditoria.models import SessaoImpersonacao
+from apps.auditoria.services import get_client_ip
 from apps.integracoes.common.exceptions import IntegrationError
 from apps.integracoes.ufsb.oauth.client import UFSBOAuthClient
 from apps.integracoes.ufsb.oauth.services import AuthenticateUFSBUserService
 
+from .forms import JustificativaImpersonacaoForm
+from .middleware import IMPERSONATION_SESSION_KEY
+from .models import Usuario
+from .permissions import pode_simular_usuario, usuario_pode_ser_simulado
 from .services import ProvisionarUsuarioUFSBService
 
 logger = logging.getLogger(__name__)
@@ -155,3 +163,67 @@ def logout(request):
         return redirect(f"{logout_url}{separator}{urlencode({'service': service_url})}")
     messages.success(request, "Sessão encerrada.")
     return redirect("core:home")
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def impersonar_iniciar(request, usuario_uuid):
+    if not request.user.is_authenticated:
+        return redirect(f"{reverse('contas:login')}?next={request.path}")
+    ator = getattr(request, "real_user", request.user)
+    if getattr(request, "is_impersonating", False) or not pode_simular_usuario(ator):
+        raise PermissionDenied
+    alvo = get_object_or_404(Usuario, uuid=usuario_uuid)
+    if not usuario_pode_ser_simulado(ator, alvo):
+        raise PermissionDenied
+
+    form = JustificativaImpersonacaoForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        for sessao_anterior in SessaoImpersonacao.objects.filter(
+            ator=ator,
+            encerrada_em__isnull=True,
+        ):
+            sessao_anterior.encerrar(
+                usuario=ator,
+                motivo="Encerrada automaticamente ao iniciar nova simulação.",
+            )
+        request.session.cycle_key()
+        sessao = SessaoImpersonacao.objects.create(
+            ator=ator,
+            usuario_simulado=alvo,
+            justificativa=form.cleaned_data["justificativa"],
+            iniciada_em=timezone.now(),
+            request_id_inicio=getattr(request, "request_id", ""),
+            endereco_ip_inicio=get_client_ip(request),
+            user_agent_inicio=request.META.get("HTTP_USER_AGENT", "")[:500],
+        )
+        request.session[IMPERSONATION_SESSION_KEY] = str(sessao.uuid)
+        request.session.modified = True
+        messages.warning(
+            request,
+            f"Simulação iniciada como {alvo}. O modo é somente leitura.",
+        )
+        return redirect("core:home")
+
+    return render(
+        request,
+        "contas/impersonar_confirmar.html",
+        {"form": form, "alvo": alvo},
+    )
+
+
+@never_cache
+@require_POST
+def impersonar_encerrar(request):
+    if not request.user.is_authenticated:
+        raise PermissionDenied
+    ator = getattr(request, "real_user", request.user)
+    sessao = getattr(request, "impersonation_session", None)
+    if not getattr(request, "is_impersonating", False) or not sessao:
+        raise PermissionDenied
+    sessao.encerrar(usuario=ator, motivo="Encerrada manualmente pelo usuário técnico.")
+    request.session.pop(IMPERSONATION_SESSION_KEY, None)
+    request.session.cycle_key()
+    request.session.modified = True
+    messages.success(request, f"Simulação de {sessao.usuario_simulado} encerrada.")
+    return redirect("cadastros:lista", resource_slug="usuarios")

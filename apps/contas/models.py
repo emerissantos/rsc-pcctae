@@ -16,6 +16,10 @@ class Usuario(AbstractUser):
         verbose_name = "usuário"
         verbose_name_plural = "usuários"
         ordering = ["username"]
+        permissions = [
+            ("importar_usuario_sig", "Pode importar usuário do SIG"),
+            ("simular_usuario", "Pode simular acesso de outro usuário"),
+        ]
 
     def __str__(self) -> str:
         return self.nome_exibicao or self.get_full_name() or self.username

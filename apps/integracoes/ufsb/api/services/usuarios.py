@@ -52,6 +52,25 @@ class UsuariosUFSBService:
             )
         return matching[0]
 
+
+    def get_by_identifier(
+        self,
+        *,
+        id_usuario: int | None = None,
+        login: str | None = None,
+        id_institucional: int | None = None,
+    ) -> UsuarioInstitucionalDTO:
+        return self.resolve_from_userinfo(
+            OAuthUserInfo(
+                id_usuario=id_usuario,
+                id_institucional=id_institucional,
+                login=login,
+                nome=None,
+                email=None,
+                raw={},
+            )
+        )
+
     @staticmethod
     def _matches(usuario: UsuarioInstitucionalDTO, userinfo: OAuthUserInfo) -> bool:
         if userinfo.id_usuario is not None:

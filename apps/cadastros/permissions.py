@@ -9,6 +9,22 @@ GROUP_DEFINITIONS: dict[str, tuple[str, ...]] = {
         resource.permission(action)
         for resource in RESOURCES.values()
         for action in ("view", "add", "change", "delete")
+    )
+    + (
+        "contas.importar_usuario_sig",
+        "contas.simular_usuario",
+        "triagem.acessar_fila_triagem",
+        "triagem.iniciar_triagem",
+        "triagem.alterar_triagem",
+        "triagem.concluir_triagem",
+    ),
+    "Gestão de Pessoas e Acessos": (
+        "contas.view_usuario",
+        "contas.change_usuario",
+        "contas.importar_usuario_sig",
+        "pessoas.view_pessoainstitucional",
+        "pessoas.view_servidor",
+        "pessoas.view_vinculofuncional",
     ),
     "Gestão de Comissões": (
         "comissoes.view_comissao",
@@ -18,7 +34,7 @@ GROUP_DEFINITIONS: dict[str, tuple[str, ...]] = {
         "comissoes.add_membrocomissao",
         "comissoes.change_membrocomissao",
         "contas.view_usuario",
-        "pessoas.view_personainstitucional",
+        "pessoas.view_pessoainstitucional",
         "pessoas.view_servidor",
         "pessoas.view_vinculofuncional",
     ),
@@ -42,7 +58,24 @@ GROUP_DEFINITIONS: dict[str, tuple[str, ...]] = {
         "comissoes.view_comissao",
         "comissoes.view_membrocomissao",
     ),
-    "Consulta de Cadastros": tuple(resource.permission("view") for resource in RESOURCES.values()),
+    "Operação de Triagem": (
+        "triagem.acessar_fila_triagem",
+        "triagem.iniciar_triagem",
+        "triagem.alterar_triagem",
+        "triagem.concluir_triagem",
+        "triagem.view_triagemrequerimento",
+        "triagem.view_verificacaochecklisttriagem",
+        "requerimentos.view_requerimento",
+        "requerimentos.view_lancamentoitem",
+        "requerimentos.view_documentolancamento",
+        "comissoes.view_comissao",
+        "comissoes.view_membrocomissao",
+    ),
+    "Consulta de Cadastros": tuple(
+        resource.permission("view")
+        for resource in RESOURCES.values()
+        if resource.app_label != "auditoria"
+    ),
 }
 
 

@@ -11,7 +11,6 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files import File
 from django.db import transaction
-from django.db.models import Q
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -20,6 +19,7 @@ from django.utils.http import content_disposition_header
 from django.views.decorators.http import require_POST
 
 from apps.pontuacao.models import ItemPontuacao, Requisito
+from apps.triagem.permissions import pode_visualizar_requerimento
 
 from .forms import RequerimentoForm, limpar_quantidade
 from .models import DocumentoLancamento, LancamentoItem, Requerimento, UploadTemporario
@@ -34,28 +34,13 @@ def _requerimento_do_usuario(request, uuid, *, editavel=False) -> Requerimento:
     requerimento = get_object_or_404(queryset, uuid=uuid)
 
     eh_requerente = requerimento.requerente_id == request.user.id
-    hoje = timezone.localdate()
-    eh_membro_comissao = bool(
-        requerimento.comissao_id
-        and request.user.participacoes_comissoes.filter(
-            comissao_id=requerimento.comissao_id,
-            ativo=True,
-            inicio_mandato__lte=hoje,
-            comissao__ativa=True,
-            comissao__inicio_vigencia__lte=hoje,
-        ).filter(
-            Q(fim_mandato__isnull=True) | Q(fim_mandato__gte=hoje),
-            Q(comissao__fim_vigencia__isnull=True) | Q(comissao__fim_vigencia__gte=hoje),
-        ).exists()
-    )
-    pode_visualizar = request.user.is_staff or eh_requerente or eh_membro_comissao
+    pode_visualizar = eh_requerente or pode_visualizar_requerimento(request.user, requerimento)
     if not pode_visualizar:
         raise PermissionDenied
 
-    # Membros da comissão podem consultar documentos, mas não alterar o
-    # preenchimento do servidor. A edição continua restrita ao requerente e à
-    # administração, sempre enquanto o requerimento estiver editável.
-    if editavel and not (request.user.is_staff or eh_requerente):
+    # A consulta pode ser ampliada para membros ativos ou operadores de triagem,
+    # mas o preenchimento permanece exclusivamente sob responsabilidade do requerente.
+    if editavel and not eh_requerente:
         raise PermissionDenied
     if editavel and not requerimento.pode_editar:
         raise PermissionDenied("O requerimento não está disponível para edição.")

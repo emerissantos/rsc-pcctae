@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django import forms
+from django.db import models
 
 from apps.comissoes.models import Comissao, MembroComissao
 from apps.contas.models import Usuario
@@ -27,9 +28,11 @@ class CadastroModelForm(forms.ModelForm):
 
 MANAGED_GROUP_NAMES = (
     "Administradores do RSC-PCCTAE",
+    "Gestão de Pessoas e Acessos",
     "Gestão de Comissões",
     "Gestão de Pontuação",
     "Gestão de Triagem",
+    "Operação de Triagem",
     "Consulta de Cadastros",
 )
 
@@ -182,3 +185,48 @@ class ConfiguracaoTriagemForm(CadastroModelForm):
     class Meta:
         model = ConfiguracaoTriagem
         fields = ("prazo_correcao_dias",)
+
+
+class ImportarUsuarioSIGForm(forms.Form):
+    class Identificador(models.TextChoices):
+        LOGIN = "login", "Login institucional"
+        ID_USUARIO = "id_usuario", "ID do usuário"
+        ID_INSTITUCIONAL = "id_institucional", "ID institucional da pessoa"
+
+    tipo_identificador = forms.ChoiceField(
+        label="Identificador para consulta",
+        choices=Identificador.choices,
+        initial=Identificador.LOGIN,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    valor = forms.CharField(
+        label="Valor",
+        max_length=150,
+        strip=True,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "autocomplete": "off",
+                "placeholder": "Informe o login ou identificador institucional",
+            }
+        ),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        tipo = cleaned.get("tipo_identificador")
+        valor = (cleaned.get("valor") or "").strip()
+        if tipo in {self.Identificador.ID_USUARIO, self.Identificador.ID_INSTITUCIONAL}:
+            try:
+                cleaned["valor_numerico"] = int(valor)
+            except (TypeError, ValueError):
+                self.add_error("valor", "Informe um identificador numérico válido.")
+        elif tipo == self.Identificador.LOGIN:
+            cleaned["valor"] = valor.lower()
+        return cleaned
+
+    def service_kwargs(self) -> dict[str, object]:
+        tipo = self.cleaned_data["tipo_identificador"]
+        if tipo == self.Identificador.LOGIN:
+            return {"login": self.cleaned_data["valor"]}
+        return {tipo: self.cleaned_data["valor_numerico"]}

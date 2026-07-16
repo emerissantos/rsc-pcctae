@@ -12,6 +12,16 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
+from apps.auditoria.models import EventoAuditoria
+from apps.auditoria.services import registrar_evento
+from apps.contas.permissions import (
+    pode_importar_usuario_sig,
+    usuario_pode_ser_simulado,
+)
+from apps.contas.services import ImportarUsuarioSIGService
+from apps.integracoes.common.exceptions import IntegrationError
+
+from .forms import ImportarUsuarioSIGForm
 from .permissions import pode_acao, recursos_visiveis
 from .registry import (
     AREAS,
@@ -138,6 +148,13 @@ def _build_rows(request, resource: CadastroConfig, objects):
             formatted["css_class"] = column.css_class or column.kind
             cells.append(formatted)
         identifier = _object_identifier(obj)
+        ator = getattr(request, "real_user", request.user)
+        impersonate_url = ""
+        if resource.slug == "usuarios" and usuario_pode_ser_simulado(ator, obj):
+            impersonate_url = reverse(
+                "contas:impersonar-iniciar",
+                kwargs={"usuario_uuid": obj.uuid},
+            )
         rows.append(
             {
                 "object": obj,
@@ -154,6 +171,7 @@ def _build_rows(request, resource: CadastroConfig, objects):
                 )
                 if can_delete
                 else "",
+                "impersonate_url": impersonate_url,
             }
         )
     return rows
@@ -257,6 +275,8 @@ def lista(request, resource_slug):
         "filters": filter_controls,
         "active_filter_count": active_filter_count,
         "can_create": pode_acao(request.user, resource, "add") and resource.allow_create,
+        "can_import_sig": resource.slug == "usuarios"
+        and pode_importar_usuario_sig(getattr(request, "real_user", request.user)),
         "query_without_page": _query_string(request.GET, page=None),
     }
     partial = (
@@ -373,4 +393,50 @@ def excluir(request, resource_slug, object_id):
         request,
         "cadastros/confirmar_exclusao.html",
         {"resource": resource, "area": AREAS[resource.area], "object": obj},
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def importar_usuario_sig(request):
+    ator = getattr(request, "real_user", request.user)
+    if not pode_importar_usuario_sig(ator):
+        raise PermissionDenied
+    form = ImportarUsuarioSIGForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            result = ImportarUsuarioSIGService().execute(
+                **form.service_kwargs(),
+                correlation_id=getattr(request, "request_id", ""),
+            )
+        except IntegrationError as exc:
+            messages.error(request, str(exc))
+        else:
+            registrar_evento(
+                request,
+                tipo=EventoAuditoria.Tipo.IMPORTACAO_USUARIO_SIG,
+                ator=ator,
+                usuario_afetado=result.usuario,
+                descricao=f"Usuário {result.usuario.username} importado ou atualizado pelo SIG.",
+                dados={
+                    "tipo_identificador": form.cleaned_data["tipo_identificador"],
+                    "vinculos_sincronizados": result.vinculos_count,
+                    "id_usuario_externo": result.identidade.id_usuario_externo,
+                    "id_institucional": result.identidade.id_institucional,
+                },
+            )
+            messages.success(
+                request,
+                f"{result.usuario} foi importado ou atualizado com sucesso. "
+                f"{result.vinculos_count} vínculo(s) funcional(is) sincronizado(s).",
+            )
+            return redirect("cadastros:lista", resource_slug="usuarios")
+    return render(
+        request,
+        "cadastros/importar_usuario_sig.html",
+        {
+            "form": form,
+            "resource": _resource_or_404("usuarios"),
+            "area": AREAS["pessoas-acessos"],
+        },
     )

@@ -6,6 +6,7 @@ app_name = "cadastros"
 
 urlpatterns = [
     path("", views.central, name="central"),
+    path("usuarios/importar-sig/", views.importar_usuario_sig, name="importar-usuario-sig"),
     path("areas/<slug:area_slug>/", views.area, name="area"),
     path("<slug:resource_slug>/", views.lista, name="lista"),
     path("<slug:resource_slug>/novo/", views.criar, name="criar"),

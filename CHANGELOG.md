@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.7.1 — correção das autorizações da triagem
+
+- remove o acesso implícito à triagem concedido por `is_staff`;
+- exige vínculo ativo em comissão vigente, superusuário ou permissões operacionais explícitas;
+- separa os perfis Gestão de Triagem e Operação de Triagem;
+- restringe início, alteração e conclusão por permissões distintas;
+- fecha o acesso direto a requerimentos e comprovantes para staff sem competência operacional;
+- adiciona testes de regressão para vínculo inativo, URL direta e permissões parciais.
+
+## 0.7.0 — importação institucional e simulação de usuário
+
+- criada importação administrativa por login, ID do usuário ou ID institucional;
+- reutilizado o provisionamento institucional para pessoa, servidor, vínculos, identidade e conta;
+- contas importadas permanecem sem senha local e autenticam exclusivamente por OAuth;
+- criado perfil Gestão de Pessoas e Acessos;
+- adicionadas permissões específicas para importar e simular usuários;
+- implementado Logar como para staff autorizado, com preservação do ator original;
+- simulação funciona em modo somente leitura e bloqueia todas as ações de escrita;
+- impedida a simulação de superusuários, contas inativas e do próprio ator;
+- criados registros permanentes de sessões de simulação e eventos técnicos;
+- adicionada área Auditoria e suporte na Central de Cadastros;
+- botão Importar do SIG e ação Logar como integrados ao grid padronizado de usuários;
+- adicionadas migrations, testes de autorização, importação, isolamento e bloqueio de escrita.
+
 ## 0.6.0 — Central de Cadastros
 
 - criado um único acesso de menu para a Central de Cadastros;

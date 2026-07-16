@@ -13,7 +13,10 @@
     <h1>{{ resource.title }}</h1>
     <p>{{ resource.description }}</p>
   </div>
-  {% if can_create %}<a class="button button-primary" href="{% url 'cadastros:criar' resource.slug %}">＋ Novo registro</a>{% endif %}
+  <div class="page-heading-actions">
+    {% if can_import_sig %}<a class="button button-secondary" href="{% url 'cadastros:importar-usuario-sig' %}">⇩ Importar do SIG</a>{% endif %}
+    {% if can_create %}<a class="button button-primary" href="{% url 'cadastros:criar' resource.slug %}">＋ Novo registro</a>{% endif %}
+  </div>
 </div>
 <form class="cadastro-toolbar" method="get" data-dynamic-grid-form data-grid-url="{% url 'cadastros:lista' resource.slug %}">
   <div class="cadastro-search-wrap">

@@ -1,23 +1,25 @@
-RSC-PCCTAE 0.6.0 — VALIDAÇÃO
+RSC-PCCTAE 0.7.1 — VALIDAÇÃO
 
 Data: 2026-07-16
 
 Resultado:
 - Django system check: aprovado
 - makemigrations --check --dry-run: nenhuma alteração pendente
-- pytest: 49 testes aprovados
+- pytest: 59 testes aprovados
 - Ruff: aprovado
 - compilação Python: aprovada
-- seed de regras e perfis: aprovada
+- migrations aplicadas em banco limpo: aprovado
+- seed_rsc executada duas vezes sem duplicação: aprovado
 
-Funcionalidades validadas:
-- Central de Cadastros e cards por permissão;
-- bloqueio de usuários sem permissão;
-- áreas restritas aos perfis autorizados;
-- grid com pesquisa, filtros, ordenação, paginação e resposta parcial;
-- criação e edição genéricas com auditoria;
-- cadastros sincronizados somente para consulta;
-- atribuição de perfis de acesso pela tela de usuários;
-- grupos de acesso criados de forma idempotente;
-- tela Meus requerimentos isolada por usuário;
-- triagem, uploads privados e confirmações das versões anteriores preservados.
+Correções validadas:
+- is_staff não concede acesso implícito à triagem;
+- membro com participação inativa não visualiza o item Triagem;
+- membro inativo recebe HTTP 403 na fila;
+- staff sem competência operacional recebe HTTP 403 em URL direta de triagem;
+- staff sem competência operacional não acessa diretamente requerimento de terceiro;
+- Gestão de Triagem permanece restrita aos cadastros estruturais;
+- Operação de Triagem concede acesso e atuação explícita;
+- permissão de fila isolada não autoriza iniciar triagem;
+- membros ativos de comissão continuam autorizados pelo vínculo;
+- superusuário mantém acesso emergencial;
+- consulta operacional não amplia a edição do requerimento do servidor.

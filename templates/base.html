@@ -41,6 +41,15 @@
       <div><span class="eyebrow">Sistema institucional</span><strong>{% block page_title %}RSC-PCCTAE{% endblock %}</strong></div>
       <div class="topbar-actions"><span class="status-dot"></span><span>Ambiente conectado</span></div>
     </header>
+    {% if request.is_impersonating %}
+    <div class="impersonation-banner" role="status">
+      <div>
+        <span class="impersonation-icon">◎</span>
+        <span><strong>Simulando {{ request.user }}</strong><small>Usuário técnico: {{ request.real_user }} · modo somente leitura</small></span>
+      </div>
+      <form method="post" action="{% url 'contas:impersonar-encerrar' %}">{% csrf_token %}<button class="button button-light" type="submit">Encerrar simulação</button></form>
+    </div>
+    {% endif %}
     <main class="page-container">
 {% else %}
 <main class="public-shell">

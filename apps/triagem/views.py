@@ -19,40 +19,15 @@ from .models import (
     TriagemRequerimento,
     VerificacaoChecklistTriagem,
 )
-
-
-def _comissoes_do_usuario(usuario):
-    hoje = timezone.localdate()
-    return (
-        Comissao.objects.filter(
-            ativa=True,
-            inicio_vigencia__lte=hoje,
-            membros__usuario=usuario,
-            membros__ativo=True,
-            membros__inicio_mandato__lte=hoje,
-        )
-        .filter(Q(fim_vigencia__isnull=True) | Q(fim_vigencia__gte=hoje))
-        .filter(Q(membros__fim_mandato__isnull=True) | Q(membros__fim_mandato__gte=hoje))
-        .distinct()
-    )
-
-
-def _pode_acessar_triagem(usuario, requerimento: Requerimento) -> bool:
-    if usuario.is_staff:
-        return True
-    if not requerimento.comissao_id:
-        return False
-    hoje = timezone.localdate()
-    return usuario.participacoes_comissoes.filter(
-        comissao_id=requerimento.comissao_id,
-        ativo=True,
-        inicio_mandato__lte=hoje,
-        comissao__ativa=True,
-        comissao__inicio_vigencia__lte=hoje,
-    ).filter(
-        Q(fim_mandato__isnull=True) | Q(fim_mandato__gte=hoje),
-        Q(comissao__fim_vigencia__isnull=True) | Q(comissao__fim_vigencia__gte=hoje),
-    ).exists()
+from .permissions import (
+    PERMISSAO_ACESSAR_FILA,
+    comissoes_ativas_do_usuario,
+    pode_acessar_fila,
+    pode_alterar_triagem,
+    pode_concluir_triagem,
+    pode_iniciar_triagem,
+    pode_visualizar_requerimento,
+)
 
 
 def _comissao_atual():
@@ -117,11 +92,10 @@ def fila(request):
     queryset = Requerimento.objects.filter(situacao__in=situacoes).select_related(
         "requerente", "vinculo", "nivel_pretendido", "comissao"
     )
-    if not request.user.is_staff:
-        comissoes = _comissoes_do_usuario(request.user)
-        if not comissoes.exists():
-            raise PermissionDenied
-        queryset = queryset.filter(comissao__in=comissoes)
+    if not pode_acessar_fila(request.user):
+        raise PermissionDenied
+    if not (request.user.is_superuser or request.user.has_perm(PERMISSAO_ACESSAR_FILA)):
+        queryset = queryset.filter(comissao__in=comissoes_ativas_do_usuario(request.user))
     return render(request, "triagem/fila.html", {"requerimentos": queryset})
 
 
@@ -135,21 +109,21 @@ def iniciar(request, uuid):
         return redirect("triagem:fila")
 
     if not requerimento.comissao_id:
-        if request.user.is_staff:
+        if request.user.is_superuser or request.user.has_perm(PERMISSAO_ACESSAR_FILA):
             comissao = _comissao_atual()
         else:
-            comissao = _comissoes_do_usuario(request.user).order_by("-inicio_vigencia").first()
+            comissao = (
+                comissoes_ativas_do_usuario(request.user).order_by("-inicio_vigencia").first()
+            )
         if not comissao:
             messages.error(request, "Não há comissão vigente disponível para a triagem.")
             return redirect("triagem:fila")
         requerimento.comissao = comissao
 
-    if not _pode_acessar_triagem(request.user, requerimento):
+    if not pode_iniciar_triagem(request.user, requerimento):
         raise PermissionDenied
 
-    rodada = (
-        requerimento.triagens.aggregate(maior=Max("rodada"))["maior"] or 0
-    ) + 1
+    rodada = (requerimento.triagens.aggregate(maior=Max("rodada"))["maior"] or 0) + 1
     itens = list(ItemChecklistTriagem.objects.filter(ativo=True))
     if not itens:
         messages.error(
@@ -211,7 +185,7 @@ def detalhe(request, uuid):
         ).prefetch_related("verificacoes__item"),
         uuid=uuid,
     )
-    if not _pode_acessar_triagem(request.user, triagem.requerimento):
+    if not pode_visualizar_requerimento(request.user, triagem.requerimento):
         raise PermissionDenied
     formularios = [
         (verificacao, VerificacaoChecklistForm(instance=verificacao, prefix=str(verificacao.uuid)))
@@ -241,7 +215,7 @@ def salvar(request, uuid):
         TriagemRequerimento.objects.select_related("requerimento"),
         uuid=uuid,
     )
-    if not _pode_acessar_triagem(request.user, triagem.requerimento):
+    if not pode_alterar_triagem(request.user, triagem.requerimento):
         raise PermissionDenied
     if not triagem.em_andamento:
         messages.error(request, "Esta triagem já foi concluída.")
@@ -260,7 +234,7 @@ def concluir(request, uuid):
         TriagemRequerimento.objects.select_for_update().select_related("requerimento"),
         uuid=uuid,
     )
-    if not _pode_acessar_triagem(request.user, triagem.requerimento):
+    if not pode_concluir_triagem(request.user, triagem.requerimento):
         raise PermissionDenied
     if not triagem.em_andamento:
         messages.error(request, "Esta triagem já foi concluída.")

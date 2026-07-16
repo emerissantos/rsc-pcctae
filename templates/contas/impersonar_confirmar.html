@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Logar como {{ alvo }} | RSC-PCCTAE{% endblock %}
+{% block page_title %}Simulação de usuário{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="Navegação estrutural">
+  <a href="{% url 'cadastros:central' %}">Cadastros</a><span>›</span>
+  <a href="{% url 'cadastros:lista' 'usuarios' %}">Usuários</a><span>›</span>
+  <strong>Logar como</strong>
+</nav>
+<div class="page-heading">
+  <div>
+    <span class="eyebrow orange">Suporte técnico auditado</span>
+    <h1>Logar como {{ alvo }}</h1>
+    <p>Você visualizará o sistema com as permissões e os dados acessíveis a este usuário.</p>
+  </div>
+</div>
+<form method="post" class="cadastro-form" novalidate>
+  {% csrf_token %}
+  <section class="card simulation-target-card">
+    <div class="simulation-target-avatar">{{ alvo.username|first|upper }}</div>
+    <div><strong>{{ alvo }}</strong><small>{{ alvo.username }}{% if alvo.email %} · {{ alvo.email }}{% endif %}</small></div>
+    <span class="grid-badge grid-badge-info">Somente leitura</span>
+  </section>
+  <section class="card form-section-card danger-card-soft">
+    <div class="section-heading"><div><span class="step-index">!</span><div><strong>Controles de segurança</strong><small>A conta original continuará autenticada e poderá encerrar a simulação pelo aviso fixo na tela.</small></div></div></div>
+    <ul class="compact-list"><li>Nenhuma alteração, envio ou exclusão será permitida.</li><li>Não é possível simular superusuários.</li><li>Ator, alvo, horário, IP, navegador e justificativa serão registrados.</li></ul>
+    <div class="form-group span-full">
+      <label for="{{ form.justificativa.id_for_label }}">{{ form.justificativa.label }}<span class="required-mark">*</span></label>
+      {{ form.justificativa }}
+      <small class="help-text">{{ form.justificativa.help_text }}</small>
+      {% for error in form.justificativa.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+  </section>
+  <div class="sticky-form-actions">
+    <a class="button button-ghost" href="{% url 'cadastros:lista' 'usuarios' %}">Cancelar</a>
+    <button class="button button-primary" type="submit">Iniciar simulação</button>
+  </div>
+</form>
+{% endblock %}

@@ -1,6 +1,6 @@
 # Sistema RSC-PCCTAE — UFSB
 
-Versão **0.6.0**, com Central de Cadastros operacional e padronizada.
+Versão **0.7.1**, com autorização operacional de triagem separada do acesso técnico e administrativo.
 
 ## Escopo desta versão
 
@@ -25,6 +25,9 @@ O sistema foi simplificado para o fluxo operacional do RSC-PCCTAE:
 - Central de Cadastros com cards por área e visibilidade baseada em permissões;
 - grids reutilizáveis com pesquisa dinâmica, filtros recolhíveis, ordenação e paginação;
 - perfis operacionais atribuídos pela própria interface, sem dependência cotidiana do Django Admin;
+- importação administrativa de usuários do SIG, sem exigir primeiro login;
+- simulação auditada de usuários em modo somente leitura para suporte técnico;
+- área de auditoria com histórico de importações, simulações e ações bloqueadas;
 - interface responsiva inspirada nas capturas de referência fornecidas.
 
 Não há módulo de normas, versões normativas, matrizes ou ciclos de avaliação.
@@ -88,7 +91,7 @@ Itens configurados como inteiros aceitam somente `1`, `2`, `3` etc. A interface 
 
 ## Fluxo de triagem
 
-Após a submissão, o sistema associa o requerimento à comissão vigente. O acesso à fila é permitido a usuários administrativos e a membros com comissão e mandato ativos.
+Após a submissão, o sistema associa o requerimento à comissão vigente. O acesso à fila é permitido a membros com comissão e mandato ativos, a superusuários ou a usuários com o perfil explícito **Operação de Triagem**. O atributo `is_staff` não concede acesso ao processo.
 
 A triagem funciona por rodadas:
 
@@ -100,11 +103,11 @@ A triagem funciona por rodadas:
 6. o servidor ajusta os itens e submete novamente, iniciando nova rodada;
 7. sem pendências, o requerimento segue para **Em análise**.
 
-O prazo para correção é definido em **Administração → Configurações da triagem** e pode ser de 10, 30 ou 90 dias. O vencimento não altera automaticamente a situação do processo; a gestão permanece com a presidência da comissão.
+O prazo para correção é definido em **Cadastros → Triagem → Configuração da triagem** e pode ser de 10, 30 ou 90 dias. O vencimento não altera automaticamente a situação do processo; a gestão permanece com a presidência da comissão.
 
 ## Central de Cadastros e perfis de acesso
 
-O menu principal possui somente o item **Cadastros**. A página central distribui os recursos em cards de **Pessoas e acessos**, **Comissões**, **Pontuação** e **Triagem**. Cada card e cada operação são exibidos conforme as permissões do usuário.
+O menu principal possui somente o item **Cadastros**. A página central distribui os recursos em cards de **Pessoas e acessos**, **Comissões**, **Pontuação**, **Triagem** e **Auditoria e suporte**. Cada card e cada operação são exibidos conforme as permissões do usuário.
 
 As listagens compartilham a mesma infraestrutura: pesquisa com atualização dinâmica, filtros avançados recolhidos, ordenação por colunas, paginação, quantidade de linhas por página, badges, estado vazio e formulários em cards. Pesquisa, filtros, ordenação e página permanecem na URL.
 
@@ -113,6 +116,7 @@ Os dados de pessoas, servidores e vínculos funcionais são somente para consult
 Perfis disponíveis:
 
 - **Administradores do RSC-PCCTAE**;
+- **Gestão de Pessoas e Acessos**;
 - **Gestão de Comissões**;
 - **Gestão de Pontuação**;
 - **Gestão de Triagem**;
@@ -121,6 +125,30 @@ Perfis disponíveis:
 A atribuição é feita em **Cadastros → Pessoas e acessos → Usuários**. O perfil administrativo não amplia a tela **Meus requerimentos**: ela continua mostrando exclusivamente os requerimentos do usuário autenticado. As filas de trabalho da comissão permanecem em telas operacionais próprias.
 
 O Django Admin continua disponível como retaguarda técnica apenas para superusuários.
+
+## Importação de usuários e suporte técnico
+
+Em **Cadastros → Pessoas e acessos → Usuários**, usuários autorizados podem consultar uma conta pelo login institucional, ID do usuário ou ID institucional da pessoa. A importação cria ou atualiza:
+
+- pessoa institucional;
+- servidor;
+- todos os vínculos funcionais retornados pela API;
+- identidade externa;
+- conta local com senha inutilizável.
+
+A autenticação continua sendo exclusivamente pelo OAuth institucional. A importação não define senha local e não presume dados ausentes na API. Para evitar ambiguidades, prefira o login ou o ID do usuário; um ID institucional que corresponda a mais de uma conta será rejeitado.
+
+A ação **Logar como** aparece na grade de usuários somente para contas staff que também possuam a permissão específica de simulação. A sessão:
+
+- preserva o usuário técnico original;
+- assume a visão e as permissões do usuário selecionado;
+- funciona somente para leitura;
+- bloqueia POST, PUT, PATCH e DELETE;
+- não permite simular superusuários;
+- registra ator, alvo, justificativa, data, IP, navegador e request ID;
+- exibe um aviso fixo com a opção **Encerrar simulação**.
+
+Os registros ficam disponíveis em **Cadastros → Auditoria e suporte**.
 
 ## Requisitos técnicos
 
@@ -135,8 +163,8 @@ O Django Admin continua disponível como retaguarda técnica apenas para superus
 ### 1. Extraia o projeto
 
 ```bash
-unzip rsc-pcctae-v0.6.0.zip
-cd rsc-pcctae-v0.6.0/rsc-pcctae
+unzip rsc-pcctae-v0.7.1.zip
+cd rsc-pcctae-v0.7.1/rsc-pcctae
 ```
 
 ### 2. Crie o `.env`

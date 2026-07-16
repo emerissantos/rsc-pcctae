@@ -8,6 +8,7 @@ from typing import Any
 
 from django.db import models
 
+from apps.auditoria.models import EventoAuditoria, SessaoImpersonacao
 from apps.comissoes.models import Comissao, MembroComissao
 from apps.contas.models import Usuario
 from apps.pessoas.models import PessoaInstitucional, Servidor, VinculoFuncional
@@ -427,6 +428,62 @@ RESOURCES: dict[str, CadastroConfig] = {
             ("Organização", ("ordem",)),
         ),
     ),
+    "eventos-auditoria": CadastroConfig(
+        slug="eventos-auditoria",
+        area="auditoria-suporte",
+        model=EventoAuditoria,
+        title="Eventos de auditoria",
+        description="Importações e ações técnicas relevantes registradas pelo sistema.",
+        icon="A",
+        columns=(
+            Column("tipo", "Evento", "get_tipo_display", "tipo", "badge"),
+            Column("ator", "Realizado por", "ator", "ator__username"),
+            Column("afetado", "Usuário afetado", "usuario_afetado", "usuario_afetado__username"),
+            Column("descricao", "Descrição", "descricao", "descricao", "truncate"),
+            Column("data", "Registrado em", "created_at", "created_at", "datetime"),
+        ),
+        search_fields=(
+            "ator__username",
+            "ator__nome_exibicao",
+            "usuario_afetado__username",
+            "usuario_afetado__nome_exibicao",
+            "descricao",
+            "request_id",
+        ),
+        filters=(Filter("tipo", "Tipo de evento", "tipo", "choices"),),
+        default_ordering="-created_at",
+        select_related=("ator", "usuario_afetado"),
+        allow_create=False,
+        allow_update=False,
+    ),
+    "sessoes-simulacao": CadastroConfig(
+        slug="sessoes-simulacao",
+        area="auditoria-suporte",
+        model=SessaoImpersonacao,
+        title="Sessões de simulação",
+        description="Histórico de acessos realizados com a funcionalidade Logar como.",
+        icon="◎",
+        columns=(
+            Column("ator", "Usuário técnico", "ator", "ator__username"),
+            Column("alvo", "Usuário simulado", "usuario_simulado", "usuario_simulado__username"),
+            Column("justificativa", "Justificativa", "justificativa", "justificativa", "truncate"),
+            Column("inicio", "Iniciada em", "iniciada_em", "iniciada_em", "datetime"),
+            Column("fim", "Encerrada em", "encerrada_em", "encerrada_em", "datetime"),
+        ),
+        search_fields=(
+            "ator__username",
+            "ator__nome_exibicao",
+            "usuario_simulado__username",
+            "usuario_simulado__nome_exibicao",
+            "justificativa",
+            "request_id_inicio",
+        ),
+        filters=(Filter("ativa", "Sessão ativa", "encerrada_em__isnull", "boolean"),),
+        default_ordering="-iniciada_em",
+        select_related=("ator", "usuario_simulado", "encerrada_por"),
+        allow_create=False,
+        allow_update=False,
+    ),
     "configuracao-triagem": CadastroConfig(
         slug="configuracao-triagem",
         area="triagem",
@@ -481,6 +538,14 @@ AREAS: dict[str, CadastroArea] = {
         icon="✓",
         accent="green",
         resources=("checklist-triagem", "configuracao-triagem"),
+    ),
+    "auditoria-suporte": CadastroArea(
+        slug="auditoria-suporte",
+        title="Auditoria e suporte",
+        description="Importações institucionais e sessões técnicas de simulação.",
+        icon="A",
+        accent="orange",
+        resources=("eventos-auditoria", "sessoes-simulacao"),
     ),
 }
 

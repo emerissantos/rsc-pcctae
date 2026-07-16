@@ -18,9 +18,10 @@
           <td class="{{ cell.css_class }}">{% if cell.badge %}<span class="grid-badge grid-badge-{{ cell.badge_class }}">{{ cell.text }}</span>{% else %}<span title="{{ cell.text }}">{{ cell.text }}</span>{% endif %}</td>
           {% endfor %}
           <td class="row-actions">
+            {% if row.impersonate_url %}<a class="icon-action warning" href="{{ row.impersonate_url }}" title="Logar como este usuário" aria-label="Logar como este usuário">◎</a>{% endif %}
             {% if row.edit_url %}<a class="icon-action" href="{{ row.edit_url }}" title="Editar" aria-label="Editar registro">✎</a>{% endif %}
             {% if row.delete_url %}<a class="icon-action danger" href="{{ row.delete_url }}" title="Excluir" aria-label="Excluir registro">×</a>{% endif %}
-            {% if not row.edit_url and not row.delete_url %}<span class="readonly-mark" title="Somente consulta">◉</span>{% endif %}
+            {% if not row.impersonate_url and not row.edit_url and not row.delete_url %}<span class="readonly-mark" title="Somente consulta">◉</span>{% endif %}
           </td>
         </tr>
         {% empty %}

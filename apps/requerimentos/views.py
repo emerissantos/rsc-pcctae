@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from pathlib import Path
 from urllib.parse import quote
 
@@ -8,16 +9,19 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.files import File
 from django.db import transaction
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import content_disposition_header
 from django.views.decorators.http import require_POST
 
 from apps.pontuacao.models import ItemPontuacao, Requisito
 
 from .forms import RequerimentoForm, limpar_quantidade
-from .models import DocumentoLancamento, LancamentoItem, Requerimento
+from .models import DocumentoLancamento, LancamentoItem, Requerimento, UploadTemporario
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +95,9 @@ def criar(request):
 @login_required
 def detalhe(request, uuid):
     requerimento = _requerimento_do_usuario(request, uuid)
-    lancamentos = requerimento.lancamentos.select_related(
-        "item__requisito"
-    ).prefetch_related("documentos")
+    lancamentos = requerimento.lancamentos.select_related("item__requisito").prefetch_related(
+        "documentos"
+    )
     return render(
         request,
         "requerimentos/detalhe.html",
@@ -121,35 +125,117 @@ def itens(request, uuid):
 
 @login_required
 @require_POST
+def upload_comprovante(request, uuid, item_uuid):
+    requerimento = _requerimento_do_usuario(request, uuid, editavel=True)
+    item = get_object_or_404(ItemPontuacao, uuid=item_uuid, ativo=True)
+    upload = request.FILES.get("arquivo")
+    if upload is None:
+        return JsonResponse({"ok": False, "erro": "Nenhum arquivo foi enviado."}, status=400)
+    try:
+        _validar_upload(upload)
+        temporario = UploadTemporario.objects.create(
+            usuario=request.user,
+            requerimento=requerimento,
+            item=item,
+            arquivo=upload,
+            nome_original=Path(upload.name).name,
+            tipo_mime=getattr(upload, "content_type", "") or "",
+            tamanho_bytes=upload.size,
+            expira_em=timezone.now() + timedelta(hours=24),
+            created_by=request.user,
+            updated_by=request.user,
+        )
+    except ValidationError as exc:
+        return JsonResponse({"ok": False, "erro": exc.messages[0]}, status=400)
+    return JsonResponse(
+        {
+            "ok": True,
+            "id": str(temporario.uuid),
+            "nome": temporario.nome_original,
+            "tamanho": temporario.tamanho_bytes,
+            "status": temporario.status,
+            "delete_url": reverse(
+                "requerimentos:remover-upload",
+                kwargs={"uuid": requerimento.uuid, "upload_uuid": temporario.uuid},
+            ),
+        },
+        status=201,
+    )
+
+
+@login_required
+@require_POST
+def remover_upload_temporario(request, uuid, upload_uuid):
+    requerimento = _requerimento_do_usuario(request, uuid, editavel=True)
+    upload = get_object_or_404(
+        UploadTemporario,
+        uuid=upload_uuid,
+        usuario=request.user,
+        requerimento=requerimento,
+        status=UploadTemporario.Status.CONCLUIDO,
+    )
+    upload.remover_arquivo()
+    upload.delete()
+    return JsonResponse({"ok": True})
+
+
+def _vincular_upload(*, upload, lancamento, usuario):
+    documento = DocumentoLancamento(
+        lancamento=lancamento,
+        nome_original=upload.nome_original,
+        tipo_mime=upload.tipo_mime,
+        tamanho_bytes=upload.tamanho_bytes,
+        sha256=upload.sha256,
+        created_by=usuario,
+        updated_by=usuario,
+    )
+    with upload.arquivo.storage.open(upload.arquivo.name, "rb") as origem:
+        documento.arquivo.save(upload.nome_original, File(origem), save=False)
+    documento.save()
+    nome_temporario = upload.arquivo.name
+    storage = upload.arquivo.storage
+    upload.status = UploadTemporario.Status.VINCULADO
+    upload.updated_by = usuario
+    upload.save(update_fields=["status", "updated_by", "updated_at"])
+    transaction.on_commit(lambda: storage.delete(nome_temporario))
+
+
+@login_required
+@require_POST
 @transaction.atomic
 def salvar_item(request, uuid, item_uuid):
     requerimento = _requerimento_do_usuario(request, uuid, editavel=True)
     item = get_object_or_404(ItemPontuacao, uuid=item_uuid, ativo=True)
-    lancamento_existente = LancamentoItem.objects.filter(
-        requerimento=requerimento,
-        item=item,
-    ).prefetch_related("documentos").first()
-    uploads = request.FILES.getlist("documentos")
+    lancamento_existente = (
+        LancamentoItem.objects.filter(requerimento=requerimento, item=item)
+        .prefetch_related("documentos")
+        .first()
+    )
+    upload_ids = list(dict.fromkeys(request.POST.getlist("upload_ids")))
 
     try:
         quantidade = limpar_quantidade(request.POST.get("quantidade", ""))
         item.calcular(quantidade)
-        for upload in uploads:
-            _validar_upload(upload)
+        uploads = list(
+            UploadTemporario.objects.select_for_update().filter(
+                uuid__in=upload_ids,
+                usuario=request.user,
+                requerimento=requerimento,
+                item=item,
+                status=UploadTemporario.Status.CONCLUIDO,
+                expira_em__gt=timezone.now(),
+            )
+        )
+        if len(uploads) != len(upload_ids):
+            raise ValidationError("Um ou mais uploads não são válidos ou expiraram.")
         possui_documento = bool(uploads) or bool(
-            lancamento_existente
-            and lancamento_existente.documentos.filter(ativo=True).exists()
+            lancamento_existente and lancamento_existente.documentos.filter(ativo=True).exists()
         )
         if item.exige_anexo and not possui_documento:
-            raise ValidationError(
-                "Selecione ao menos um comprovante para salvar este item."
-            )
+            raise ValidationError("Envie ao menos um comprovante antes de salvar este item.")
     except ValidationError as exc:
         mensagem = exc.messages[0]
-        if request.headers.get("x-requested-with") == "XMLHttpRequest":
-            return JsonResponse({"ok": False, "erro": mensagem}, status=400)
-        messages.error(request, mensagem)
-        return redirect("requerimentos:itens", uuid=requerimento.uuid)
+        return JsonResponse({"ok": False, "erro": mensagem}, status=400)
 
     lancamento, created = LancamentoItem.objects.get_or_create(
         requerimento=requerimento,
@@ -168,29 +254,17 @@ def salvar_item(request, uuid, item_uuid):
         lancamento.save()
 
     for upload in uploads:
-        DocumentoLancamento.objects.create(
-            lancamento=lancamento,
-            arquivo=upload,
-            nome_original=upload.name,
-            tipo_mime=getattr(upload, "content_type", "") or "",
-            tamanho_bytes=upload.size,
-            created_by=request.user,
-            updated_by=request.user,
-        )
+        _vincular_upload(upload=upload, lancamento=lancamento, usuario=request.user)
 
     requerimento.refresh_from_db(fields=["pontuacao_declarada"])
-    if request.headers.get("x-requested-with") == "XMLHttpRequest":
-        return JsonResponse(
-            {
-                "ok": True,
-                "pontuacao_item": f"{lancamento.pontuacao_declarada:.2f}",
-                "pontuacao_total": f"{requerimento.pontuacao_declarada:.2f}",
-                "documentos": lancamento.documentos.filter(ativo=True).count(),
-                "avisos": [],
-            }
-        )
-    messages.success(request, f"Item {item.codigo} salvo.")
-    return redirect("requerimentos:itens", uuid=requerimento.uuid)
+    return JsonResponse(
+        {
+            "ok": True,
+            "pontuacao_item": f"{lancamento.pontuacao_declarada:.2f}",
+            "pontuacao_total": f"{requerimento.pontuacao_declarada:.2f}",
+            "documentos": lancamento.documentos.filter(ativo=True).count(),
+        }
+    )
 
 
 @login_required
@@ -238,9 +312,7 @@ def baixar_documento(request, uuid, documento_uuid):
             content_type=content_type,
         )
 
-    resposta["Content-Disposition"] = content_disposition_header(
-        True, documento.nome_original
-    )
+    resposta["Content-Disposition"] = content_disposition_header(True, documento.nome_original)
     resposta["X-Content-Type-Options"] = "nosniff"
     resposta["Cache-Control"] = "private, no-store, no-cache, max-age=0"
     resposta["Pragma"] = "no-cache"
@@ -274,9 +346,9 @@ def remover_documento(request, uuid, documento_uuid):
 @login_required
 def revisao(request, uuid):
     requerimento = _requerimento_do_usuario(request, uuid, editavel=True)
-    lancamentos = requerimento.lancamentos.select_related(
-        "item__requisito"
-    ).prefetch_related("documentos")
+    lancamentos = requerimento.lancamentos.select_related("item__requisito").prefetch_related(
+        "documentos"
+    )
     erros = requerimento.validar_submissao()
     return render(
         request,

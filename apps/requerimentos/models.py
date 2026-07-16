@@ -133,18 +133,14 @@ class Requerimento(UUIDPublicModel, AuditModel):
                 "O nível pretendido exige ao menos "
                 f"{self.nivel_pretendido.quantidade_minima_itens} itens pontuados."
             )
-        requisitos_usados = set(
-            self.lancamentos.values_list("item__requisito__codigo", flat=True)
-        )
+        requisitos_usados = set(self.lancamentos.values_list("item__requisito__codigo", flat=True))
         obrigatorios = set(
             self.nivel_pretendido.requisitos_obrigatorios.values_list("codigo", flat=True)
         )
         faltantes = sorted(obrigatorios - requisitos_usados)
         if faltantes:
             erros.append(
-                "Inclua ao menos um item dos requisitos obrigatórios: "
-                + ", ".join(faltantes)
-                + "."
+                "Inclua ao menos um item dos requisitos obrigatórios: " + ", ".join(faltantes) + "."
             )
         return erros
 
@@ -304,6 +300,91 @@ def documento_lancamento_upload_to(instance, filename: str) -> str:
             nome_armazenado,
         ]
     )
+
+
+def upload_temporario_upload_to(instance, filename: str) -> str:
+    caminho_original = Path(filename)
+    extensao = caminho_original.suffix.lower()[:15]
+    nome_base = _segmento_caminho(caminho_original.stem, "documento")
+    nome_armazenado = f"{instance.uuid.hex}-{nome_base}{extensao}"
+    numero = _numero_requerimento_seguro(instance.requerimento)
+    return "/".join(
+        [
+            "temporarios",
+            "requerimentos",
+            numero,
+            f"usuario-{instance.usuario_id}",
+            nome_armazenado,
+        ]
+    )
+
+
+class UploadTemporario(UUIDPublicModel, AuditModel):
+    class Status(models.TextChoices):
+        CONCLUIDO = "CONCLUIDO", "Concluído"
+        VINCULADO = "VINCULADO", "Vinculado"
+        ERRO = "ERRO", "Erro"
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="uploads_temporarios_rsc",
+    )
+    requerimento = models.ForeignKey(
+        Requerimento,
+        on_delete=models.CASCADE,
+        related_name="uploads_temporarios",
+    )
+    item = models.ForeignKey(
+        "pontuacao.ItemPontuacao",
+        on_delete=models.PROTECT,
+        related_name="uploads_temporarios",
+    )
+    arquivo = models.FileField(upload_to=upload_temporario_upload_to, max_length=500)
+    nome_original = models.CharField(max_length=255)
+    tipo_mime = models.CharField(max_length=150, blank=True)
+    tamanho_bytes = models.PositiveBigIntegerField(default=0)
+    sha256 = models.CharField(max_length=64, blank=True, db_index=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.CONCLUIDO, db_index=True
+    )
+    expira_em = models.DateTimeField(db_index=True)
+
+    class Meta:
+        verbose_name = "upload temporário"
+        verbose_name_plural = "uploads temporários"
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(
+                fields=["usuario", "status", "expira_em"],
+                name="idx_upload_tmp_usuario_status",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.nome_original
+
+    def save(self, *args, **kwargs):
+        if self.arquivo and not self.nome_original:
+            self.nome_original = Path(self.arquivo.name).name
+        if self.arquivo and not self.tamanho_bytes:
+            self.tamanho_bytes = getattr(self.arquivo, "size", 0)
+        if self.arquivo and not self.sha256:
+            digest = hashlib.sha256()
+            for chunk in self.arquivo.chunks():
+                digest.update(chunk)
+            self.sha256 = digest.hexdigest()
+            try:
+                self.arquivo.seek(0)
+            except (AttributeError, OSError):
+                pass
+        return super().save(*args, **kwargs)
+
+    def remover_arquivo(self) -> None:
+        nome = self.arquivo.name if self.arquivo else ""
+        storage = self.arquivo.storage if self.arquivo else None
+        if nome and storage:
+            storage.delete(nome)
 
 
 class DocumentoLancamento(UUIDPublicModel, AuditModel):

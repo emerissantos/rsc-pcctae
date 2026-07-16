@@ -1,6 +1,6 @@
 # Sistema RSC-PCCTAE — UFSB
 
-Versão **0.4.2**, com upload funcional e documentos privados.
+Versão **0.4.3**, com upload funcional e documentos privados.
 
 ## Escopo desta versão
 
@@ -91,8 +91,8 @@ Itens configurados como inteiros aceitam somente `1`, `2`, `3` etc. A interface 
 ### 1. Extraia o projeto
 
 ```bash
-unzip rsc-pcctae-v0.4.2.zip
-cd rsc-pcctae-v0.4.2/rsc-pcctae
+unzip rsc-pcctae-v0.4.3.zip
+cd rsc-pcctae-v0.4.3/rsc-pcctae
 ```
 
 ### 2. Crie o `.env`
@@ -222,3 +222,19 @@ apps/
 - `docs/modelo-simplificado-rsc.md`
 - `docs/padroes-interface-requerimento.md`
 - `docs/referencias-ui/`
+
+## Upload assíncrono de comprovantes
+
+Na tela de itens, a seleção de arquivos inicia o envio imediatamente. Cada arquivo mostra o progresso individual e o botão **Salvar item** permanece desabilitado enquanto houver upload em andamento, falha de envio, quantidade inválida ou ausência de comprovante obrigatório.
+
+Os arquivos permanecem temporariamente por até 24 horas. Ao salvar o item, são vinculados ao lançamento e armazenados em:
+
+```text
+media/requerimentos/RSC-AAAA-NNNNNN/requisito-{codigo}/item-{codigo}/{uuid}-{nome-seguro}
+```
+
+Para limpar uploads abandonados:
+
+```bash
+python manage.py limpar_uploads_temporarios
+```

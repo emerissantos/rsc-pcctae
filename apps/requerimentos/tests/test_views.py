@@ -7,7 +7,12 @@ from django.urls import reverse
 from apps.contas.models import IdentidadeExterna, Usuario
 from apps.pessoas.models import PessoaInstitucional, Servidor, VinculoFuncional
 from apps.pontuacao.models import ItemPontuacao, NivelRSC, Requisito
-from apps.requerimentos.models import DocumentoLancamento, LancamentoItem, Requerimento
+from apps.requerimentos.models import (
+    DocumentoLancamento,
+    LancamentoItem,
+    Requerimento,
+    UploadTemporario,
+)
 
 
 @pytest.mark.django_db
@@ -85,24 +90,40 @@ def requerimento_com_item(db):
     return usuario, requerimento, item
 
 
+def enviar_upload(client, requerimento, item, arquivo):
+    response = client.post(
+        reverse("requerimentos:upload-comprovante", args=[requerimento.uuid, item.uuid]),
+        {"arquivo": arquivo},
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def salvar_com_uploads(client, requerimento, item, *, quantidade, arquivos, observacao=""):
+    ids = [enviar_upload(client, requerimento, item, arquivo) for arquivo in arquivos]
+    return client.post(
+        reverse("requerimentos:salvar-item", args=[requerimento.uuid, item.uuid]),
+        {"quantidade": quantidade, "observacao": observacao, "upload_ids": ids},
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+
+
 @pytest.mark.django_db
-def test_salvar_item_aceita_varios_comprovantes(
-    client, requerimento_com_item, tmp_path, settings
-):
+def test_salvar_item_aceita_varios_comprovantes(client, requerimento_com_item, tmp_path, settings):
     settings.MEDIA_ROOT = tmp_path
     usuario, requerimento, item = requerimento_com_item
     client.force_login(usuario)
-    response = client.post(
-        reverse("requerimentos:salvar-item", args=[requerimento.uuid, item.uuid]),
-        {
-            "quantidade": "2",
-            "observacao": "Dois períodos comprovados.",
-            "documentos": [
-                SimpleUploadedFile("periodo-1.pdf", b"um", content_type="application/pdf"),
-                SimpleUploadedFile("periodo-2.pdf", b"dois", content_type="application/pdf"),
-            ],
-        },
-        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    response = salvar_com_uploads(
+        client,
+        requerimento,
+        item,
+        quantidade="2",
+        observacao="Dois períodos comprovados.",
+        arquivos=[
+            SimpleUploadedFile("periodo-1.pdf", b"um", content_type="application/pdf"),
+            SimpleUploadedFile("periodo-2.pdf", b"dois", content_type="application/pdf"),
+        ],
     )
 
     assert response.status_code == 200
@@ -147,6 +168,31 @@ def test_item_obrigatorio_exige_comprovante(client, requerimento_com_item):
 
 
 @pytest.mark.django_db
+def test_upload_temporario_so_vira_documento_apos_salvar(
+    client, requerimento_com_item, tmp_path, settings
+):
+    settings.MEDIA_ROOT = tmp_path
+    usuario, requerimento, item = requerimento_com_item
+    client.force_login(usuario)
+    upload_id = enviar_upload(
+        client,
+        requerimento,
+        item,
+        SimpleUploadedFile("temporario.pdf", b"temporario", content_type="application/pdf"),
+    )
+    assert UploadTemporario.objects.filter(uuid=upload_id, status="CONCLUIDO").exists()
+    assert not DocumentoLancamento.objects.exists()
+    response = client.post(
+        reverse("requerimentos:salvar-item", args=[requerimento.uuid, item.uuid]),
+        {"quantidade": "1", "upload_ids": [upload_id]},
+        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    )
+    assert response.status_code == 200
+    assert DocumentoLancamento.objects.count() == 1
+    assert UploadTemporario.objects.get(uuid=upload_id).status == "VINCULADO"
+
+
+@pytest.mark.django_db
 def test_documento_so_e_entregue_por_endpoint_autenticado(
     client, requerimento_com_item, tmp_path, settings
 ):
@@ -154,15 +200,18 @@ def test_documento_so_e_entregue_por_endpoint_autenticado(
     settings.RSC_USE_X_ACCEL_REDIRECT = False
     usuario, requerimento, item = requerimento_com_item
     client.force_login(usuario)
-    client.post(
-        reverse("requerimentos:salvar-item", args=[requerimento.uuid, item.uuid]),
-        {
-            "quantidade": "2",
-            "documentos": SimpleUploadedFile(
-                "periodos.pdf", b"conteudo-privado", content_type="application/pdf"
-            ),
-        },
-        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    salvar_com_uploads(
+        client,
+        requerimento,
+        item,
+        quantidade="2",
+        arquivos=[
+            SimpleUploadedFile(
+                "periodos.pdf",
+                b"conteudo-privado",
+                content_type="application/pdf",
+            )
+        ],
     )
     documento = DocumentoLancamento.objects.get()
 
@@ -181,31 +230,23 @@ def test_documento_so_e_entregue_por_endpoint_autenticado(
 
     # Não existe rota pública que sirva o caminho físico do arquivo.
     assert client.get(f"/media/{documento.arquivo.name}").status_code == 404
-    assert (
-        client.get(f"/_private_files_not_public_/{documento.arquivo.name}").status_code
-        == 404
-    )
+    assert client.get(f"/_private_files_not_public_/{documento.arquivo.name}").status_code == 404
     with pytest.raises(ValueError, match="não possuem URL pública"):
         _ = documento.arquivo.url
 
 
 @pytest.mark.django_db
-def test_outro_usuario_nao_acessa_documento(
-    client, requerimento_com_item, tmp_path, settings
-):
+def test_outro_usuario_nao_acessa_documento(client, requerimento_com_item, tmp_path, settings):
     settings.MEDIA_ROOT = tmp_path
     settings.RSC_USE_X_ACCEL_REDIRECT = False
     proprietario, requerimento, item = requerimento_com_item
     client.force_login(proprietario)
-    client.post(
-        reverse("requerimentos:salvar-item", args=[requerimento.uuid, item.uuid]),
-        {
-            "quantidade": "1",
-            "documentos": SimpleUploadedFile(
-                "privado.pdf", b"segredo", content_type="application/pdf"
-            ),
-        },
-        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    salvar_com_uploads(
+        client,
+        requerimento,
+        item,
+        quantidade="1",
+        arquivos=[SimpleUploadedFile("privado.pdf", b"segredo", content_type="application/pdf")],
     )
     documento = DocumentoLancamento.objects.get()
 
@@ -229,15 +270,12 @@ def test_producao_autoriza_nginx_sem_expor_url_publica(
     settings.RSC_PROTECTED_MEDIA_INTERNAL_URL = "/_protected_media/"
     usuario, requerimento, item = requerimento_com_item
     client.force_login(usuario)
-    client.post(
-        reverse("requerimentos:salvar-item", args=[requerimento.uuid, item.uuid]),
-        {
-            "quantidade": "1",
-            "documentos": SimpleUploadedFile(
-                "interno.pdf", b"interno", content_type="application/pdf"
-            ),
-        },
-        HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+    salvar_com_uploads(
+        client,
+        requerimento,
+        item,
+        quantidade="1",
+        arquivos=[SimpleUploadedFile("interno.pdf", b"interno", content_type="application/pdf")],
     )
     documento = DocumentoLancamento.objects.get()
 

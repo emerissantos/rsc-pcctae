@@ -2,7 +2,13 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
 
-from .models import DocumentoLancamento, HistoricoRequerimento, LancamentoItem, Requerimento
+from .models import (
+    DocumentoLancamento,
+    HistoricoRequerimento,
+    LancamentoItem,
+    Requerimento,
+    UploadTemporario,
+)
 
 
 class LancamentoInline(admin.TabularInline):
@@ -103,3 +109,17 @@ class HistoricoRequerimentoAdmin(admin.ModelAdmin):
         "created_at",
         "created_by",
     )
+
+
+@admin.register(UploadTemporario)
+class UploadTemporarioAdmin(admin.ModelAdmin):
+    list_display = ("nome_original", "requerimento", "item", "usuario", "status", "expira_em")
+    list_filter = ("status", "expira_em")
+    search_fields = ("nome_original", "requerimento__numero", "usuario__username", "sha256")
+    readonly_fields = tuple(field.name for field in UploadTemporario._meta.fields)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

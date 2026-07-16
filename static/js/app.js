@@ -73,8 +73,26 @@
     };
     const removeTemporaryUpload = async (key) => {
       const current = uploads.get(key); if (!current) return;
-      if (current.deleteUrl) await fetch(current.deleteUrl, {method: 'POST', headers: {'X-CSRFToken': csrfToken(form), 'X-Requested-With': 'XMLHttpRequest'}});
-      current.row.remove(); uploads.delete(key); updateSaveState();
+      const confirmed = window.confirm(
+        'Remover este arquivo? Esta ação não poderá ser desfeita e será necessário enviá-lo novamente para utilizá-lo neste item.'
+      );
+      if (!confirmed) return;
+      if (current.deleteUrl) {
+        const response = await fetch(current.deleteUrl, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrfToken(form),
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        });
+        if (!response.ok) {
+          showFeedback('Não foi possível remover o arquivo. Tente novamente.', 'error');
+          return;
+        }
+      }
+      current.row.remove();
+      uploads.delete(key);
+      updateSaveState();
     };
     const uploadFile = (file, key) => new Promise((resolve, reject) => {
       const row = renderUpload(file, key); const bar = row.querySelector('.upload-progress span'); const status = row.querySelector('[data-upload-status]');
@@ -113,4 +131,11 @@
     });
     updateScore();
   });
+  document.addEventListener('submit', (event) => {
+    const form = event.target.closest('form[data-confirm-message]');
+    if (!form) return;
+    const message = form.dataset.confirmMessage || 'Confirma esta ação? Ela não poderá ser desfeita.';
+    if (!window.confirm(message)) event.preventDefault();
+  });
+
 })();

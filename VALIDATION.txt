@@ -1,23 +1,11 @@
-RSC-PCCTAE 0.4.3 — VALIDAÇÃO
+RSC-PCCTAE 0.4.4
 
-Data: 2026-07-16
-
-Resultado:
-- Django system check: aprovado
-- makemigrations --check --dry-run: nenhuma alteração pendente
+Validação executada:
 - pytest: 32 testes aprovados
-- Ruff: aprovado
-- compilação Python: aprovada
+- confirmação antes de remover item: implementada
+- confirmação antes de remover documento salvo: implementada
+- confirmação antes de remover upload temporário: implementada
+- mensagem de irreversibilidade: implementada
 
-Funcionalidades validadas nesta versão:
-- upload assíncrono com progresso por arquivo;
-- armazenamento temporário antes de salvar o item;
-- botão Salvar item bloqueado durante upload ou sem comprovante obrigatório;
-- associação segura por usuário, requerimento e item;
-- múltiplos comprovantes por item;
-- movimentação para o diretório definitivo após salvar;
-- estrutura definitiva por número do requerimento/requisito/item;
-- remoção de upload temporário antes do salvamento;
-- expiração e comando de limpeza de temporários;
-- validação de quantidade inteira no frontend e backend;
-- download privado e autorização de acesso.
+Observação:
+O comando django check fora do Docker não foi concluído neste ambiente por ausência do driver PostgreSQL (psycopg/psycopg2). No ambiente Docker do projeto, as dependências são instaladas pelo requirements.txt.

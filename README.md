@@ -1,6 +1,6 @@
 # Sistema RSC-PCCTAE — UFSB
 
-Versão **0.4.3**, com upload funcional e documentos privados.
+Versão **0.4.4**, com upload funcional e documentos privados.
 
 ## Escopo desta versão
 
@@ -91,8 +91,8 @@ Itens configurados como inteiros aceitam somente `1`, `2`, `3` etc. A interface 
 ### 1. Extraia o projeto
 
 ```bash
-unzip rsc-pcctae-v0.4.3.zip
-cd rsc-pcctae-v0.4.3/rsc-pcctae
+unzip rsc-pcctae-v0.4.4.zip
+cd rsc-pcctae-v0.4.4/rsc-pcctae
 ```
 
 ### 2. Crie o `.env`

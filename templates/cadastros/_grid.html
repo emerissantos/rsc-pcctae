@@ -1,0 +1,45 @@
+<div class="card cadastro-grid-card" data-grid-fragment>
+  <div class="table-scroll">
+    <table class="data-grid">
+      <thead>
+        <tr>
+          {% for item in columns %}
+          <th class="{{ item.column.css_class }}">
+            {% if item.sortable %}<a href="{{ item.url }}" data-grid-link>{{ item.column.label }}{% if item.active %}<span class="sort-indicator">{% if item.descending %}↓{% else %}↑{% endif %}</span>{% else %}<span class="sort-indicator muted">↕</span>{% endif %}</a>{% else %}{{ item.column.label }}{% endif %}
+          </th>
+          {% endfor %}
+          <th class="actions-column"><span class="sr-only">Ações</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          {% for cell in row.cells %}
+          <td class="{{ cell.css_class }}">{% if cell.badge %}<span class="grid-badge grid-badge-{{ cell.badge_class }}">{{ cell.text }}</span>{% else %}<span title="{{ cell.text }}">{{ cell.text }}</span>{% endif %}</td>
+          {% endfor %}
+          <td class="row-actions">
+            {% if row.edit_url %}<a class="icon-action" href="{{ row.edit_url }}" title="Editar" aria-label="Editar registro">✎</a>{% endif %}
+            {% if row.delete_url %}<a class="icon-action danger" href="{{ row.delete_url }}" title="Excluir" aria-label="Excluir registro">×</a>{% endif %}
+            {% if not row.edit_url and not row.delete_url %}<span class="readonly-mark" title="Somente consulta">◉</span>{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="{{ columns|length|add:1 }}"><div class="empty-state compact"><span>⌕</span><p>Nenhum registro encontrado com os critérios informados.</p></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="grid-footer">
+    <span>Exibindo {% if page_obj.paginator.count %}{{ page_obj.start_index }}–{{ page_obj.end_index }}{% else %}0{% endif %} de {{ page_obj.paginator.count }} registro{{ page_obj.paginator.count|pluralize }}</span>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="pagination" aria-label="Paginação">
+      {% if page_obj.has_previous %}<a href="?{{ query_without_page }}&page={{ page_obj.previous_page_number }}" data-grid-link>‹</a>{% else %}<span class="disabled">‹</span>{% endif %}
+      {% for number in page_obj.paginator.page_range %}
+        {% if number == page_obj.number %}<span class="active">{{ number }}</span>
+        {% elif number >= page_obj.number|add:"-2" and number <= page_obj.number|add:"2" %}<a href="?{{ query_without_page }}&page={{ number }}" data-grid-link>{{ number }}</a>{% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}<a href="?{{ query_without_page }}&page={{ page_obj.next_page_number }}" data-grid-link>›</a>{% else %}<span class="disabled">›</span>{% endif %}
+    </nav>
+    {% endif %}
+  </div>
+</div>

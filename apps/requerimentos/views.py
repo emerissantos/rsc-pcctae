@@ -77,9 +77,12 @@ def _validar_upload(upload) -> None:
 
 @login_required
 def lista(request):
-    queryset = Requerimento.objects.select_related("vinculo", "nivel_pretendido", "requerente")
-    if not request.user.is_staff:
-        queryset = queryset.filter(requerente=request.user)
+    # A tela "Meus requerimentos" é sempre pessoal, inclusive quando o usuário
+    # também possui função administrativa. Filas operacionais da comissão usam
+    # telas próprias e nunca ampliam esta consulta.
+    queryset = Requerimento.objects.filter(requerente=request.user).select_related(
+        "vinculo", "nivel_pretendido", "requerente"
+    )
     return render(request, "requerimentos/lista.html", {"requerimentos": queryset})
 
 

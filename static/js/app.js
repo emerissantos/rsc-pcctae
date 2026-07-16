@@ -138,4 +138,89 @@
     if (!window.confirm(message)) event.preventDefault();
   });
 
+  const gridForm = document.querySelector('[data-dynamic-grid-form]');
+  if (gridForm) {
+    const grid = document.querySelector('#cadastro-grid');
+    const filterPanel = gridForm.querySelector('[data-filter-panel]');
+    let searchTimer;
+
+    const toggleFilters = (open) => {
+      if (!filterPanel) return;
+      filterPanel.classList.toggle('open', open);
+      gridForm.querySelector('[data-filter-toggle]')?.setAttribute('aria-expanded', String(open));
+    };
+    gridForm.querySelector('[data-filter-toggle]')?.addEventListener('click', () => toggleFilters(!filterPanel?.classList.contains('open')));
+    gridForm.querySelector('[data-filter-close]')?.addEventListener('click', () => toggleFilters(false));
+
+    const syncToolbarFromUrl = (target) => {
+      [...gridForm.elements].forEach((field) => {
+        if (!field.name || field.type === 'submit' || field.type === 'button') return;
+        const values = target.searchParams.getAll(field.name);
+        if (field.type === 'checkbox' || field.type === 'radio') {
+          field.checked = values.includes(field.value);
+        } else if (field.name === 'per_page') {
+          field.value = values[0] || '25';
+        } else {
+          field.value = values[0] || '';
+        }
+      });
+      const activeFilters = [...gridForm.querySelectorAll('[data-filter-panel] [name]')]
+        .filter((field) => String(field.value || '').trim() !== '').length;
+      const toggleButton = gridForm.querySelector('[data-filter-toggle]');
+      if (toggleButton) {
+        let counter = toggleButton.querySelector('.filter-count');
+        if (activeFilters && !counter) {
+          counter = document.createElement('span');
+          counter.className = 'filter-count';
+          toggleButton.append(' ', counter);
+        }
+        if (counter) {
+          counter.textContent = String(activeFilters);
+          counter.hidden = activeFilters === 0;
+        }
+      }
+    };
+
+    const loadGrid = async (url, {pushState = true} = {}) => {
+      if (!grid) return;
+      const target = new URL(url, window.location.href);
+      target.searchParams.set('partial', '1');
+      grid.classList.add('grid-loading');
+      try {
+        const response = await fetch(target, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        if (!response.ok) throw new Error('Falha ao atualizar a listagem.');
+        grid.innerHTML = await response.text();
+        target.searchParams.delete('partial');
+        syncToolbarFromUrl(target);
+        if (pushState) window.history.replaceState({}, '', target);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        grid.classList.remove('grid-loading');
+      }
+    };
+
+    const submitGridForm = () => {
+      const data = new FormData(gridForm);
+      data.delete('page');
+      const params = new URLSearchParams(data);
+      loadGrid(`${gridForm.dataset.gridUrl}?${params.toString()}`);
+    };
+    gridForm.addEventListener('submit', (event) => { event.preventDefault(); toggleFilters(false); submitGridForm(); });
+    gridForm.querySelector('[data-dynamic-search]')?.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(submitGridForm, 400); });
+    gridForm.querySelectorAll('[data-auto-submit]').forEach((field) => field.addEventListener('change', submitGridForm));
+    document.addEventListener('click', (event) => {
+      const link = event.target.closest('[data-grid-link]');
+      if (!link || !gridForm.contains(link) && !grid?.contains(link)) return;
+      event.preventDefault();
+      loadGrid(link.href);
+    });
+    gridForm.querySelector('[data-grid-reset]')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      gridForm.reset();
+      toggleFilters(false);
+      loadGrid(event.currentTarget.href);
+    });
+  }
+
 })();

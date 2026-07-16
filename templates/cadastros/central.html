@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Cadastros | RSC-PCCTAE{% endblock %}
+{% block page_title %}Central de Cadastros{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow orange">Administração operacional</span>
+    <h1>Central de Cadastros</h1>
+    <p>Acesse somente as áreas autorizadas para o seu perfil, sem sobrecarregar o menu principal.</p>
+  </div>
+</div>
+<div class="cadastro-card-grid">
+  {% for card in areas %}
+  <a class="cadastro-area-card accent-{{ card.area.accent }}" href="{% url 'cadastros:area' card.area.slug %}">
+    <span class="cadastro-card-icon">{{ card.area.icon }}</span>
+    <span class="cadastro-card-content">
+      <strong>{{ card.area.title }}</strong>
+      <small>{{ card.area.description }}</small>
+      <span class="cadastro-card-meta">{{ card.quantidade }} cadastro{{ card.quantidade|pluralize }} disponível{{ card.quantidade|pluralize }}</span>
+    </span>
+    <span class="cadastro-card-arrow">→</span>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

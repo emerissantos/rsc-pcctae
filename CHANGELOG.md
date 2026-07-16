@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.0 — Central de Cadastros
+
+- criado um único acesso de menu para a Central de Cadastros;
+- áreas apresentadas em cards conforme as permissões do usuário;
+- criada infraestrutura declarativa e reutilizável para grids e formulários;
+- pesquisa dinâmica com atraso controlado e atualização parcial da tabela;
+- filtros avançados recolhíveis, com contador de filtros ativos;
+- ordenação segura por colunas e estado preservado na URL;
+- paginação e seleção de 10, 25, 50 ou 100 registros por página;
+- formulários padronizados em cards e auditoria de criação/alteração;
+- telas próprias para comissões, membros, níveis, requisitos, itens e checklist;
+- configuração do prazo de triagem migrada para a interface operacional;
+- pessoas, servidores e vínculos disponíveis em grids somente para consulta;
+- perfis de acesso atribuídos pela própria tela de usuários;
+- grupos operacionais criados e atualizados pela seed idempotente;
+- Django Admin mantido como retaguarda técnica para superusuários;
+- tela Meus requerimentos restringida sempre ao usuário autenticado;
+- adicionados testes de autorização, cards, grid dinâmico, CRUD, auditoria e isolamento dos requerimentos.
+
 ## 0.5.0 — triagem documental
 
 - criada fila de triagem para administradores e membros vigentes da comissão;

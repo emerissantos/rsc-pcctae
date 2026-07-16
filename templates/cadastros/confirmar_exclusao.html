@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Excluir registro | Cadastros{% endblock %}
+{% block page_title %}Cadastros — {{ resource.title }}{% endblock %}
+{% block content %}
+<div class="card danger-card narrow-card">
+  <span class="eyebrow">Ação irreversível</span><h1>Excluir registro?</h1>
+  <p>O registro <strong>{{ object }}</strong> será removido. Esta ação não poderá ser desfeita.</p>
+  <form method="post">{% csrf_token %}<div class="form-actions"><a class="button button-ghost" href="{% url 'cadastros:lista' resource.slug %}">Cancelar</a><button class="button button-danger-ghost" type="submit">Excluir definitivamente</button></div></form>
+</div>
+{% endblock %}

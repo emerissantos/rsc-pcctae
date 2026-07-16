@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ area.title }} | Cadastros{% endblock %}
+{% block page_title %}Cadastros — {{ area.title }}{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="Navegação estrutural">
+  <a href="{% url 'cadastros:central' %}">Cadastros</a><span>›</span><strong>{{ area.title }}</strong>
+</nav>
+<div class="page-heading">
+  <div>
+    <span class="eyebrow orange">Área de cadastro</span>
+    <h1>{{ area.title }}</h1>
+    <p>{{ area.description }}</p>
+  </div>
+</div>
+<div class="cadastro-resource-grid">
+  {% for resource in resources %}
+  <a class="cadastro-resource-card" href="{% url 'cadastros:lista' resource.slug %}">
+    <span class="cadastro-card-icon compact">{{ resource.icon }}</span>
+    <span>
+      <strong>{{ resource.title }}</strong>
+      <small>{{ resource.description }}</small>
+    </span>
+    <span class="cadastro-card-arrow">→</span>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

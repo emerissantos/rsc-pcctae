@@ -1,6 +1,6 @@
 # Sistema RSC-PCCTAE — UFSB
 
-Versão **0.5.0**, com fluxo de triagem documental pela comissão.
+Versão **0.6.0**, com Central de Cadastros operacional e padronizada.
 
 ## Escopo desta versão
 
@@ -22,6 +22,9 @@ O sistema foi simplificado para o fluxo operacional do RSC-PCCTAE:
 - checklist configurável com histórico por snapshots;
 - devolução para correção com prazo configurável de 10, 30 ou 90 dias;
 - snapshots da regra usada no lançamento, preservando o histórico;
+- Central de Cadastros com cards por área e visibilidade baseada em permissões;
+- grids reutilizáveis com pesquisa dinâmica, filtros recolhíveis, ordenação e paginação;
+- perfis operacionais atribuídos pela própria interface, sem dependência cotidiana do Django Admin;
 - interface responsiva inspirada nas capturas de referência fornecidas.
 
 Não há módulo de normas, versões normativas, matrizes ou ciclos de avaliação.
@@ -99,6 +102,26 @@ A triagem funciona por rodadas:
 
 O prazo para correção é definido em **Administração → Configurações da triagem** e pode ser de 10, 30 ou 90 dias. O vencimento não altera automaticamente a situação do processo; a gestão permanece com a presidência da comissão.
 
+## Central de Cadastros e perfis de acesso
+
+O menu principal possui somente o item **Cadastros**. A página central distribui os recursos em cards de **Pessoas e acessos**, **Comissões**, **Pontuação** e **Triagem**. Cada card e cada operação são exibidos conforme as permissões do usuário.
+
+As listagens compartilham a mesma infraestrutura: pesquisa com atualização dinâmica, filtros avançados recolhidos, ordenação por colunas, paginação, quantidade de linhas por página, badges, estado vazio e formulários em cards. Pesquisa, filtros, ordenação e página permanecem na URL.
+
+Os dados de pessoas, servidores e vínculos funcionais são somente para consulta, pois a fonte oficial continua sendo a API institucional. Comissões, membros, níveis, requisitos, itens de pontuação, checklist e prazo da triagem possuem telas operacionais próprias.
+
+Perfis disponíveis:
+
+- **Administradores do RSC-PCCTAE**;
+- **Gestão de Comissões**;
+- **Gestão de Pontuação**;
+- **Gestão de Triagem**;
+- **Consulta de Cadastros**.
+
+A atribuição é feita em **Cadastros → Pessoas e acessos → Usuários**. O perfil administrativo não amplia a tela **Meus requerimentos**: ela continua mostrando exclusivamente os requerimentos do usuário autenticado. As filas de trabalho da comissão permanecem em telas operacionais próprias.
+
+O Django Admin continua disponível como retaguarda técnica apenas para superusuários.
+
 ## Requisitos técnicos
 
 - Docker 24 ou superior;
@@ -112,8 +135,8 @@ O prazo para correção é definido em **Administração → Configurações da 
 ### 1. Extraia o projeto
 
 ```bash
-unzip rsc-pcctae-v0.5.0.zip
-cd rsc-pcctae-v0.5.0/rsc-pcctae
+unzip rsc-pcctae-v0.6.0.zip
+cd rsc-pcctae-v0.6.0/rsc-pcctae
 ```
 
 ### 2. Crie o `.env`
@@ -234,6 +257,7 @@ apps/
 ├── comissoes/       comissões e membros
 ├── requerimentos/   pedidos, lançamentos, anexos e histórico
 ├── triagem/          checklist, prazos e encaminhamento à análise
+├── cadastros/        cards, permissões e CRUD estrutural reutilizável
 ├── auditoria/       base para eventos de auditoria
 └── core/            infraestrutura comum e dashboard
 ```
@@ -243,6 +267,7 @@ apps/
 - `docs/integracao-ufsb.md`
 - `docs/modelo-simplificado-rsc.md`
 - `docs/padroes-interface-requerimento.md`
+- `docs/central-cadastros.md`
 - `docs/referencias-ui/`
 
 ## Upload assíncrono de comprovantes

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{% if editing %}Editar{% else %}Novo{% endif %} {{ resource.title }} | Cadastros{% endblock %}
+{% block page_title %}Cadastros — {{ resource.title }}{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="Navegação estrutural">
+  <a href="{% url 'cadastros:central' %}">Cadastros</a><span>›</span>
+  <a href="{% url 'cadastros:area' area.slug %}">{{ area.title }}</a><span>›</span>
+  <a href="{% url 'cadastros:lista' resource.slug %}">{{ resource.title }}</a><span>›</span>
+  <strong>{% if editing %}Editar{% else %}Novo registro{% endif %}</strong>
+</nav>
+<div class="page-heading">
+  <div><span class="eyebrow orange">{% if editing %}Edição{% else %}Inclusão{% endif %}</span><h1>{% if editing %}Editar registro{% else %}Novo registro{% endif %}</h1><p>{{ resource.description }}</p></div>
+</div>
+<form method="post" class="cadastro-form" novalidate data-unsaved-form>{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+  {% for section_title, fields in sections %}
+  <section class="card form-section-card">
+    <div class="card-header"><div><span class="eyebrow">Seção</span><h2>{{ section_title }}</h2></div></div>
+    <div class="form-section-grid">
+      {% for field in fields %}
+      <div class="form-group {% if field.field.widget.input_type == 'checkbox' %}form-group-checkbox{% endif %} {% if field.name == 'descricao' or field.name == 'observacoes' or field.name == 'orientacao' or field.name == 'requisitos_obrigatorios' %}span-full{% endif %}">
+        {% if field.field.widget.input_type == 'checkbox' %}<label class="checkbox-label">{{ field }}<span>{{ field.label }}</span></label>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required-mark">*</span>{% endif %}</label>{{ field }}{% endif %}
+        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+        {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+  <div class="sticky-form-actions"><a class="button button-ghost" href="{% url 'cadastros:lista' resource.slug %}">Cancelar</a><button class="button button-primary" type="submit">Salvar registro</button></div>
+</form>
+{% endblock %}

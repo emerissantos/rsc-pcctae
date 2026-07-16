@@ -29,6 +29,7 @@ LOCAL_APPS = [
     "apps.comissoes.apps.ComissoesConfig",
     "apps.requerimentos.apps.RequerimentosConfig",
     "apps.triagem.apps.TriagemConfig",
+    "apps.cadastros.apps.CadastrosConfig",
     "apps.auditoria.apps.AuditoriaConfig",
 ]
 
@@ -59,6 +60,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.triagem.context_processors.permissoes_triagem",
+                "apps.cadastros.context_processors.acesso_cadastros",
             ],
         },
     },

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ resource.title }} | Cadastros{% endblock %}
+{% block page_title %}Cadastros — {{ resource.title }}{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="Navegação estrutural">
+  <a href="{% url 'cadastros:central' %}">Cadastros</a><span>›</span>
+  <a href="{% url 'cadastros:area' area.slug %}">{{ area.title }}</a><span>›</span>
+  <strong>{{ resource.title }}</strong>
+</nav>
+<div class="page-heading cadastro-list-heading">
+  <div>
+    <span class="eyebrow orange">Cadastro estrutural</span>
+    <h1>{{ resource.title }}</h1>
+    <p>{{ resource.description }}</p>
+  </div>
+  {% if can_create %}<a class="button button-primary" href="{% url 'cadastros:criar' resource.slug %}">＋ Novo registro</a>{% endif %}
+</div>
+<form class="cadastro-toolbar" method="get" data-dynamic-grid-form data-grid-url="{% url 'cadastros:lista' resource.slug %}">
+  <div class="cadastro-search-wrap">
+    <span aria-hidden="true">⌕</span>
+    <input type="search" name="q" value="{{ query }}" placeholder="Pesquisar em {{ resource.title|lower }}..." autocomplete="off" data-dynamic-search>
+  </div>
+  {% if filters %}
+  <button class="button button-ghost filter-toggle" type="button" data-filter-toggle aria-expanded="{% if active_filter_count %}true{% else %}false{% endif %}">
+    Filtros{% if active_filter_count %} <span class="filter-count">{{ active_filter_count }}</span>{% endif %}
+  </button>
+  {% endif %}
+  <label class="per-page-control">Exibir
+    <select name="per_page" data-auto-submit>
+      {% for option in per_page_options %}<option value="{{ option }}" {% if per_page == option %}selected{% endif %}>{{ option }}</option>{% endfor %}
+    </select>
+  </label>
+  <input type="hidden" name="ordering" value="{{ ordering }}">
+  {% if filters %}
+  <div class="cadastro-filter-panel {% if active_filter_count %}open{% endif %}" data-filter-panel>
+    <div class="filter-panel-heading"><div><strong>Filtros avançados</strong><small>Use apenas os campos necessários.</small></div><button type="button" class="icon-button" data-filter-close aria-label="Fechar filtros">×</button></div>
+    <div class="filter-grid">
+      {% for filter in filters %}
+      <div class="form-group">
+        <label for="filter-{{ filter.spec.param }}">{{ filter.spec.label }}</label>
+        {% if filter.spec.kind == 'date' %}
+          <input class="form-control" id="filter-{{ filter.spec.param }}" type="date" name="{{ filter.spec.param }}" value="{{ filter.value }}">
+        {% else %}
+          <select class="form-select" id="filter-{{ filter.spec.param }}" name="{{ filter.spec.param }}">
+            <option value="">Todos</option>
+            {% for value,label in filter.options %}<option value="{{ value }}" {% if filter.value == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="filter-actions"><a class="button button-link" href="{% url 'cadastros:lista' resource.slug %}" data-grid-reset>Limpar filtros</a><button class="button button-secondary" type="submit">Aplicar filtros</button></div>
+  </div>
+  {% endif %}
+</form>
+<div id="cadastro-grid" aria-live="polite">
+  {% include "cadastros/_grid.html" %}
+</div>
+{% endblock %}

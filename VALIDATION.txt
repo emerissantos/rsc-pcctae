@@ -1,23 +1,23 @@
-RSC-PCCTAE 0.5.0 — VALIDAÇÃO
+RSC-PCCTAE 0.6.0 — VALIDAÇÃO
 
 Data: 2026-07-16
 
 Resultado:
 - Django system check: aprovado
 - makemigrations --check --dry-run: nenhuma alteração pendente
-- pytest: 40 testes aprovados
+- pytest: 49 testes aprovados
 - Ruff: aprovado
 - compilação Python: aprovada
+- seed de regras e perfis: aprovada
 
 Funcionalidades validadas:
-- fila de triagem por comissão;
-- bloqueio de usuário fora da comissão;
-- início de triagem e criação do checklist;
-- snapshots dos itens do checklist;
-- conclusão sem pendências para Em análise;
-- devolução para Pendente de correção;
-- prazo configurável e snapshot do prazo;
-- exigência de orientação quando houver pendência;
-- ressubmissão após correção com histórico correto;
-- vigência de comissão e mandato nas permissões;
-- fluxo de uploads e confirmações da versão 0.4.4 preservado.
+- Central de Cadastros e cards por permissão;
+- bloqueio de usuários sem permissão;
+- áreas restritas aos perfis autorizados;
+- grid com pesquisa, filtros, ordenação, paginação e resposta parcial;
+- criação e edição genéricas com auditoria;
+- cadastros sincronizados somente para consulta;
+- atribuição de perfis de acesso pela tela de usuários;
+- grupos de acesso criados de forma idempotente;
+- tela Meus requerimentos isolada por usuário;
+- triagem, uploads privados e confirmações das versões anteriores preservados.

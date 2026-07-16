@@ -24,10 +24,11 @@
       <a href="{% url 'requerimentos:criar' %}"><span>＋</span> Novo requerimento</a>
       <a href="{% url 'pontuacao:tabela' %}" class="{% if request.resolver_match.namespace == 'pontuacao' %}active{% endif %}"><span>∑</span> Requisitos e itens</a>
       {% if pode_acessar_triagem %}<a href="{% url 'triagem:fila' %}" class="{% if request.resolver_match.namespace == 'triagem' %}active{% endif %}"><span>✓</span> Triagem</a>{% endif %}
-      {% if request.user.is_staff %}
+      {% if pode_acessar_cadastros %}
       <div class="nav-label">Administração</div>
-      <a href="{% url 'admin:index' %}"><span>⚙</span> Cadastros</a>
+      <a href="{% url 'cadastros:central' %}" class="{% if request.resolver_match.namespace == 'cadastros' %}active{% endif %}"><span>▦</span> Cadastros</a>
       {% endif %}
+      {% if request.user.is_superuser %}<a href="{% url 'admin:index' %}"><span>⚙</span> Administração técnica</a>{% endif %}
     </nav>
     <div class="sidebar-footer">
       <div class="user-chip"><span class="avatar">{{ request.user.username|first|upper }}</span><span><strong>{{ request.user }}</strong><small>{{ request.user.email|default:'Usuário autenticado' }}</small></span></div>

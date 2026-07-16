@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from apps.comissoes.models import Comissao
+from apps.requerimentos.history import montar_contexto_historico
 from apps.requerimentos.models import HistoricoRequerimento, Requerimento
 
 from .forms import TriagemConclusaoForm, VerificacaoChecklistForm
@@ -195,6 +196,10 @@ def detalhe(request, uuid):
     lancamentos = triagem.requerimento.lancamentos.select_related(
         "item__requisito"
     ).prefetch_related("documentos")
+    contexto_historico = montar_contexto_historico(
+        triagem.requerimento,
+        incluir_triagens_em_andamento=True,
+    )
     return render(
         request,
         "triagem/detalhe.html",
@@ -203,6 +208,7 @@ def detalhe(request, uuid):
             "formularios": formularios,
             "conclusao_form": conclusao_form,
             "lancamentos": lancamentos,
+            **contexto_historico,
         },
     )
 

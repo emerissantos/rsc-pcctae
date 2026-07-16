@@ -1,0 +1,90 @@
+<div class="card process-history-card">
+  <div class="card-header">
+    <div>
+      <span class="eyebrow">Rastreabilidade</span>
+      <h2>Histórico e comunicações</h2>
+      <p class="card-subtitle">Acompanhe as movimentações e as rodadas de conferência documental.</p>
+    </div>
+  </div>
+
+  {% if triagens_historico %}
+  <div class="history-section">
+    <div class="history-section-heading">
+      <div><strong>Rodadas de triagem</strong><small>Resultados, responsáveis e observações registradas pela comissão.</small></div>
+      <span class="grid-badge grid-badge-info">{{ triagens_historico|length }} rodada{{ triagens_historico|length|pluralize }}</span>
+    </div>
+    <div class="history-round-list">
+      {% for rodada in triagens_historico %}
+      <details class="history-round" {% if rodada.eh_ultima_historico %}open{% endif %}>
+        <summary>
+          <span class="history-round-number">{{ rodada.rodada }}</span>
+          <span class="history-round-title">
+            <strong>Rodada {{ rodada.rodada }}</strong>
+            <small>Iniciada em {{ rodada.iniciada_em|date:'d/m/Y H:i' }} por {{ rodada.responsavel }}</small>
+          </span>
+          <span class="badge {% if rodada.resultado == 'APTO' %}badge-deferido{% elif rodada.resultado == 'PENDENCIA' %}badge-pendente_correcao{% else %}badge-em_triagem{% endif %}">{{ rodada.get_resultado_display }}</span>
+          <span class="history-chevron">⌄</span>
+        </summary>
+        <div class="history-round-body">
+          <div class="history-meta-grid">
+            <div><small>Responsável pela rodada</small><strong>{{ rodada.responsavel }}</strong></div>
+            <div><small>Início</small><strong>{{ rodada.iniciada_em|date:'d/m/Y H:i' }}</strong></div>
+            <div><small>Conclusão</small><strong>{{ rodada.concluida_em|date:'d/m/Y H:i'|default:'Ainda não concluída' }}</strong></div>
+            <div><small>Concluída por</small><strong>{% if rodada.concluida_em %}{{ rodada.avaliador_conclusao|default:rodada.responsavel }}{% else %}—{% endif %}</strong></div>
+          </div>
+
+          {% if rodada.prazo_correcao_ate %}
+          <div class="history-deadline"><span>Prazo para correção</span><strong>{{ rodada.prazo_correcao_ate|date:'d/m/Y' }}</strong><small>{{ rodada.prazo_correcao_dias_snapshot }} dias registrados na conclusão.</small></div>
+          {% endif %}
+
+          {% if rodada.orientacao_correcao %}
+          <div class="history-guidance"><span>Orientação consolidada da comissão</span><p>{{ rodada.orientacao_correcao|linebreaksbr }}</p></div>
+          {% endif %}
+
+          <div class="history-checklist">
+            {% for verificacao in rodada.verificacoes_historico %}
+            <article class="history-check-item history-check-{{ verificacao.situacao|lower }}">
+              <div class="history-check-copy">
+                <span class="item-code">{{ verificacao.item_codigo_snapshot }}</span>
+                <strong>{{ verificacao.item_titulo_snapshot }}</strong>
+                {% if verificacao.item_descricao_snapshot %}<small>{{ verificacao.item_descricao_snapshot }}</small>{% endif %}
+              </div>
+              <div class="history-check-result">
+                <span class="grid-badge {% if verificacao.situacao == 'CONFORME' %}grid-badge-success{% elif verificacao.situacao == 'NAO_CONFORME' %}grid-badge-warning{% else %}grid-badge-neutral{% endif %}">{{ verificacao.get_situacao_display }}</span>
+                {% if verificacao.observacao %}<p>{{ verificacao.observacao|linebreaksbr }}</p>{% else %}<small>Sem observação adicional.</small>{% endif %}
+              </div>
+            </article>
+            {% empty %}
+            <div class="empty-state compact"><p>Nenhuma verificação registrada nesta rodada.</p></div>
+            {% endfor %}
+          </div>
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="history-section history-movements-section">
+    <div class="history-section-heading">
+      <div><strong>Movimentações do processo</strong><small>Alterações formais de situação registradas no requerimento.</small></div>
+    </div>
+    <ol class="process-timeline">
+      {% for movimentacao in movimentacoes_historico %}
+      <li>
+        <span class="process-timeline-marker"></span>
+        <div class="process-timeline-content">
+          <div class="process-timeline-heading">
+            <strong>{{ movimentacao.situacao_nova_label }}</strong>
+            <time>{{ movimentacao.created_at|date:'d/m/Y H:i' }}</time>
+          </div>
+          <p>{{ movimentacao.descricao }}</p>
+          <small>Registrado por {{ movimentacao.created_by|default:'Sistema' }}{% if movimentacao.situacao_anterior %} · Situação anterior: {{ movimentacao.situacao_anterior_label }}{% endif %}</small>
+        </div>
+      </li>
+      {% empty %}
+      <li class="process-timeline-empty"><div class="empty-state compact"><p>Ainda não há movimentações registradas.</p></div></li>
+      {% endfor %}
+    </ol>
+  </div>
+</div>

@@ -1,6 +1,6 @@
 # Sistema RSC-PCCTAE — UFSB
 
-Versão **0.7.1**, com autorização operacional de triagem separada do acesso técnico e administrativo.
+Versão **0.7.2**, com histórico completo de triagem e comunicações no requerimento.
 
 ## Escopo desta versão
 
@@ -21,6 +21,7 @@ O sistema foi simplificado para o fluxo operacional do RSC-PCCTAE:
 - fila de triagem para membros ativos da comissão;
 - checklist configurável com histórico por snapshots;
 - devolução para correção com prazo configurável de 10, 30 ou 90 dias;
+- histórico visual das rodadas de triagem, responsáveis, datas, orientações e pendências por item;
 - snapshots da regra usada no lançamento, preservando o histórico;
 - Central de Cadastros com cards por área e visibilidade baseada em permissões;
 - grids reutilizáveis com pesquisa dinâmica, filtros recolhíveis, ordenação e paginação;
@@ -105,6 +106,8 @@ A triagem funciona por rodadas:
 
 O prazo para correção é definido em **Cadastros → Triagem → Configuração da triagem** e pode ser de 10, 30 ou 90 dias. O vencimento não altera automaticamente a situação do processo; a gestão permanece com a presidência da comissão.
 
+Cada requerimento apresenta um bloco **Histórico e comunicações** com as movimentações formais e as rodadas concluídas. O requerente vê o responsável, as datas, o resultado, a orientação consolidada e cada item do checklist com sua observação. Rascunhos de uma triagem ainda em andamento permanecem privados da comissão e só são publicados ao servidor após a conclusão da rodada.
+
 ## Central de Cadastros e perfis de acesso
 
 O menu principal possui somente o item **Cadastros**. A página central distribui os recursos em cards de **Pessoas e acessos**, **Comissões**, **Pontuação**, **Triagem** e **Auditoria e suporte**. Cada card e cada operação são exibidos conforme as permissões do usuário.
@@ -163,8 +166,8 @@ Os registros ficam disponíveis em **Cadastros → Auditoria e suporte**.
 ### 1. Extraia o projeto
 
 ```bash
-unzip rsc-pcctae-v0.7.1.zip
-cd rsc-pcctae-v0.7.1/rsc-pcctae
+unzip rsc-pcctae-v0.7.2.zip
+cd rsc-pcctae-v0.7.2/rsc-pcctae
 ```
 
 ### 2. Crie o `.env`

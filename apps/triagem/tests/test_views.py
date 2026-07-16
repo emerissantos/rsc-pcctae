@@ -396,3 +396,99 @@ def test_permissao_de_fila_sozinha_nao_permite_iniciar(client, contexto_triagem)
     assert not TriagemRequerimento.objects.filter(
         requerimento=contexto_triagem["requerimento"]
     ).exists()
+
+
+@pytest.mark.django_db
+def test_requerente_visualiza_historico_e_observacoes_da_triagem(client, contexto_triagem):
+    requerimento = contexto_triagem["requerimento"]
+    membro = contexto_triagem["membro"]
+    client.force_login(membro)
+    client.post(reverse("triagem:iniciar", args=[requerimento.uuid]))
+    triagem = TriagemRequerimento.objects.get(requerimento=requerimento)
+    client.post(
+        reverse("triagem:concluir", args=[triagem.uuid]),
+        post_checklist(
+            triagem,
+            nao_conforme=True,
+            orientacao="Substitua o documento incompleto e submeta novamente.",
+        ),
+    )
+
+    client.force_login(contexto_triagem["requerente"])
+    resposta = client.get(reverse("requerimentos:detalhe", args=[requerimento.uuid]))
+
+    assert resposta.status_code == 200
+    assert "Correções solicitadas pela comissão" in resposta.content.decode()
+    assert "Substitua o documento incompleto" in resposta.content.decode()
+    assert "Documento incompleto." in resposta.content.decode()
+    assert str(membro) in resposta.content.decode()
+    assert "Rodada 1" in resposta.content.decode()
+    assert "Concluída por" in resposta.content.decode()
+
+
+@pytest.mark.django_db
+def test_requerente_nao_visualiza_observacao_de_triagem_em_andamento(client, contexto_triagem):
+    requerimento = contexto_triagem["requerimento"]
+    client.force_login(contexto_triagem["membro"])
+    client.post(reverse("triagem:iniciar", args=[requerimento.uuid]))
+    triagem = TriagemRequerimento.objects.get(requerimento=requerimento)
+    client.post(
+        reverse("triagem:salvar", args=[triagem.uuid]),
+        post_checklist(
+            triagem,
+            nao_conforme=True,
+            orientacao="Rascunho interno que ainda não foi comunicado.",
+        ),
+    )
+
+    client.force_login(contexto_triagem["requerente"])
+    resposta = client.get(reverse("requerimentos:detalhe", args=[requerimento.uuid]))
+
+    assert resposta.status_code == 200
+    assert "Rascunho interno que ainda não foi comunicado." not in resposta.content.decode()
+    assert "Documento incompleto." not in resposta.content.decode()
+
+
+@pytest.mark.django_db
+def test_comissao_visualiza_rodadas_anteriores_na_nova_triagem(client, contexto_triagem):
+    requerimento = contexto_triagem["requerimento"]
+    membro = contexto_triagem["membro"]
+    client.force_login(membro)
+    client.post(reverse("triagem:iniciar", args=[requerimento.uuid]))
+    primeira = TriagemRequerimento.objects.get(requerimento=requerimento)
+    client.post(
+        reverse("triagem:concluir", args=[primeira.uuid]),
+        post_checklist(
+            primeira,
+            nao_conforme=True,
+            orientacao="Orientação preservada da primeira rodada.",
+        ),
+    )
+
+    requerimento.refresh_from_db()
+    requisito = Requisito.objects.create(codigo="H", nome="Histórico", ordem=99)
+    item = ItemPontuacao.objects.create(
+        requisito=requisito,
+        codigo="H.1",
+        descricao="Item para nova submissão",
+        unidade="atividade",
+        pontos_por_quantidade=Decimal("1.00"),
+        exige_anexo=False,
+    )
+    LancamentoItem.objects.create(
+        requerimento=requerimento,
+        item=item,
+        quantidade_declarada=Decimal("1"),
+    )
+    requerimento.refresh_from_db()
+    requerimento.submeter(contexto_triagem["requerente"])
+    client.post(reverse("triagem:iniciar", args=[requerimento.uuid]))
+    segunda = TriagemRequerimento.objects.get(requerimento=requerimento, rodada=2)
+
+    resposta = client.get(reverse("triagem:detalhe", args=[segunda.uuid]))
+
+    assert resposta.status_code == 200
+    conteudo = resposta.content.decode()
+    assert "Rodada 2" in conteudo
+    assert "Rodada 1" in conteudo
+    assert "Orientação preservada da primeira rodada." in conteudo

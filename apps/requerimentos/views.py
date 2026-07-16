@@ -22,6 +22,7 @@ from apps.pontuacao.models import ItemPontuacao, Requisito
 from apps.triagem.permissions import pode_visualizar_requerimento
 
 from .forms import RequerimentoForm, limpar_quantidade
+from .history import montar_contexto_historico
 from .models import DocumentoLancamento, LancamentoItem, Requerimento, UploadTemporario
 
 logger = logging.getLogger(__name__)
@@ -91,14 +92,23 @@ def criar(request):
 @login_required
 def detalhe(request, uuid):
     requerimento = _requerimento_do_usuario(request, uuid)
-    requerimento.ultima_triagem_atual = requerimento.ultima_triagem
+    eh_requerente = requerimento.requerente_id == request.user.id
+    contexto_historico = montar_contexto_historico(
+        requerimento,
+        incluir_triagens_em_andamento=not eh_requerente,
+    )
+    requerimento.ultima_triagem_atual = contexto_historico["ultima_triagem_historico"]
     lancamentos = requerimento.lancamentos.select_related("item__requisito").prefetch_related(
         "documentos"
     )
     return render(
         request,
         "requerimentos/detalhe.html",
-        {"requerimento": requerimento, "lancamentos": lancamentos},
+        {
+            "requerimento": requerimento,
+            "lancamentos": lancamentos,
+            **contexto_historico,
+        },
     )
 
 

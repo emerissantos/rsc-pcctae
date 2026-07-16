@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.2 — histórico de triagem e comunicações
+
+- adiciona resumo destacado das correções solicitadas no requerimento;
+- exibe responsável, data de início, conclusão e usuário que concluiu a triagem;
+- apresenta orientação consolidada, prazo e pendências por item do checklist;
+- cria histórico visual reutilizável com todas as rodadas e movimentações do processo;
+- disponibiliza o mesmo histórico na tela operacional da comissão;
+- mantém observações de triagens em andamento privadas até a conclusão;
+- adiciona carregamento otimizado com `select_related` e `Prefetch`;
+- adiciona testes de transparência, privacidade de rascunhos e múltiplas rodadas.
+
 ## 0.7.1 — correção das autorizações da triagem
 
 - remove o acesso implícito à triagem concedido por `is_staff`;

@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block title %}Entrar — RSC-PCCTAE{% endblock %}
+{% block content %}
+<div class="login-layout"><section class="login-brand"><div class="brand large"><span class="brand-mark">R</span><span><strong>RSC-PCCTAE</strong><small>Universidade Federal do Sul da Bahia</small></span></div><h1>Reconhecimento de Saberes e Competências</h1><p>Solicite, acompanhe e consulte seu processo de forma segura e objetiva.</p><div class="feature-list"><span>✓ Dados funcionais integrados</span><span>✓ Cálculo automático da pontuação</span><span>✓ Acompanhamento por etapas</span></div></section><section class="login-card"><span class="eyebrow orange">Acesso institucional</span><h2>Entre com sua conta UFSB</h2><p>Você será direcionado ao serviço de autenticação institucional.</p><a class="button button-primary button-block" href="{% url 'contas:oauth-start' %}">Entrar com SIGAuth</a><small>Ao entrar, seus dados funcionais serão sincronizados para preenchimento do requerimento.</small></section></div>
+{% endblock %}

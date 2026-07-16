@@ -1,0 +1,59 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sistema RSC-PCCTAE da UFSB">
+  <title>{% block title %}RSC-PCCTAE{% endblock %}</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+{% if request.user.is_authenticated %}
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="{% url 'core:home' %}">
+      <span class="brand-mark">R</span>
+      <span><strong>RSC-PCCTAE</strong><small>UFSB</small></span>
+    </a>
+    <nav class="side-nav" aria-label="Navegação principal">
+      <a href="{% url 'core:home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}"><span>⌂</span> Visão geral</a>
+      <a href="{% url 'requerimentos:lista' %}" class="{% if request.resolver_match.namespace == 'requerimentos' %}active{% endif %}"><span>▣</span> Meus requerimentos</a>
+      <a href="{% url 'requerimentos:criar' %}"><span>＋</span> Novo requerimento</a>
+      <a href="{% url 'pontuacao:tabela' %}" class="{% if request.resolver_match.namespace == 'pontuacao' %}active{% endif %}"><span>∑</span> Requisitos e itens</a>
+      {% if request.user.is_staff %}
+      <div class="nav-label">Administração</div>
+      <a href="{% url 'admin:index' %}"><span>⚙</span> Cadastros</a>
+      {% endif %}
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-chip"><span class="avatar">{{ request.user.username|first|upper }}</span><span><strong>{{ request.user }}</strong><small>{{ request.user.email|default:'Usuário autenticado' }}</small></span></div>
+      <form method="post" action="{% url 'contas:logout' %}">{% csrf_token %}<button class="link-button" type="submit">Sair do sistema</button></form>
+    </div>
+  </aside>
+  <div class="app-content">
+    <header class="topbar">
+      <button class="icon-button menu-toggle" type="button" aria-label="Abrir menu" data-sidebar-toggle>☰</button>
+      <div><span class="eyebrow">Sistema institucional</span><strong>{% block page_title %}RSC-PCCTAE{% endblock %}</strong></div>
+      <div class="topbar-actions"><span class="status-dot"></span><span>Ambiente conectado</span></div>
+    </header>
+    <main class="page-container">
+{% else %}
+<main class="public-shell">
+{% endif %}
+      {% if messages %}<div class="messages">{% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+      {% block content %}{% endblock %}
+{% if request.user.is_authenticated %}
+    </main>
+    <footer class="app-footer">Universidade Federal do Sul da Bahia — Sistema RSC-PCCTAE</footer>
+  </div>
+</div>
+{% else %}
+</main>
+{% endif %}
+<script src="{% static 'js/app.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

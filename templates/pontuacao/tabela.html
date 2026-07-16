@@ -1,0 +1,8 @@
+{% extends 'base.html' %}
+{% block title %}Requisitos e itens — RSC-PCCTAE{% endblock %}
+{% block page_title %}Requisitos e itens{% endblock %}
+{% block content %}
+<div class="page-heading"><div><span class="eyebrow">Tabela de referência</span><h1>Requisitos e itens de pontuação</h1><p>O cálculo de cada lançamento é feito por quantidade × pontuação do item.</p></div></div>
+<div class="level-grid">{% for nivel in niveis %}<article class="level-card"><span>RSC {{ nivel.codigo }}</span><strong>{{ nivel.pontuacao_minima }} pts</strong><small>Mínimo de {{ nivel.quantidade_minima_itens }} item(ns)</small></article>{% endfor %}</div>
+<div class="accordion-list">{% for requisito in requisitos %}<details class="requirement-card" {% if forloop.first %}open{% endif %}><summary><span class="requirement-code">{{ requisito.codigo }}</span><span class="requirement-title"><strong>{{ requisito.nome }}</strong><small>{{ requisito.descricao }}</small></span><span class="chevron">⌄</span></summary><div class="requirement-body"><div class="responsive-table"><table><thead><tr><th>Item</th><th>Descrição</th><th>Unidade</th><th>Pontos</th></tr></thead><tbody>{% for item in requisito.itens.all %}<tr><td><span class="item-code">{{ item.codigo }}</span></td><td>{{ item.descricao }}</td><td>{{ item.unidade }}</td><td><strong>{{ item.pontos_por_quantidade }}</strong></td></tr>{% endfor %}</tbody></table></div></div></details>{% endfor %}</div>
+{% endblock %}

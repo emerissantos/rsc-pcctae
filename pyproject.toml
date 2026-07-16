@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rsc-pcctae"
+version = "0.4.0"
+description = "Sistema institucional para gerenciamento do RSC-PCCTAE da UFSB"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "Django==5.2.8",
+    "psycopg[binary]>=3.2,<4",
+    "gunicorn>=23,<24",
+    "requests>=2.32,<3",
+    "python-dotenv>=1.0,<2",
+    "redis>=5.2,<6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-django>=4.9,<5",
+    "factory-boy>=3.3,<4",
+    "ruff>=0.8,<1",
+]
+
+[tool.setuptools.packages.find]
+include = ["config*", "apps*"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py", "*_test.py", "tests.py"]
+addopts = "-ra --strict-markers"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["**/migrations/**"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "DJ"]
+ignore = ["DJ001"]
+
+[tool.ruff.lint.per-file-ignores]
+"apps/pontuacao/seed_data.py" = ["E501"]

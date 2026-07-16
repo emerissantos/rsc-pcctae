@@ -1,0 +1,27 @@
+RSC-PCCTAE 0.4.0 — RELATÓRIO DE VALIDAÇÃO
+
+Arquitetura:
+- Sem ciclos de avaliação.
+- Sem módulo de normas ou versões normativas.
+- Requisitos e itens operacionais.
+- Cálculo por item e quantidade.
+- Anexos e observação opcional.
+- Snapshots das regras nos lançamentos.
+
+Seed:
+- 6 requisitos.
+- 57 itens de pontuação.
+- 6 níveis de RSC.
+- Titular e substituto representados por itens separados.
+- Idempotência verificada.
+
+Validações executadas:
+- pytest: 23 testes aprovados.
+- django check: sem problemas.
+- makemigrations --check --dry-run: nenhuma alteração pendente.
+- ruff check: aprovado.
+- compilação dos templates principais: aprovada.
+
+Observação:
+- Os testes automatizados usam SQLite em memória.
+- A instalação final utiliza PostgreSQL 16 e Redis 7 pelo Docker Compose.

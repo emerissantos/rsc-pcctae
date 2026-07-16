@@ -1,0 +1,31 @@
+# Segredos e configurações locais
+.env
+.env.*
+!.env.example
+
+# Controle de versão e IDE
+.git
+.gitignore
+.idea
+.vscode
+
+# Python e testes
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Dados e artefatos locais
+media/
+staticfiles/
+logs/
+*.log
+*.sqlite3
+
+# Arquivos do sistema
+.DS_Store

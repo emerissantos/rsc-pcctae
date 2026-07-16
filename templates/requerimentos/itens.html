@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Itens — {{ requerimento.numero }}{% endblock %}
+{% block page_title %}{{ requerimento.numero }}{% endblock %}
+{% block content %}
+<div class="page-heading"><div><span class="eyebrow">Etapa 2 de 3</span><h1>Itens de pontuação</h1><p>Informe somente a quantidade computável, anexe os comprovantes e registre observação quando necessário.</p></div><span class="badge badge-rascunho">{{ requerimento.get_situacao_display }}</span></div>
+<div class="stepper"><div class="step done"><span>✓</span><div><strong>Dados iniciais</strong><small>Concluído</small></div></div><div class="step active"><span>2</span><div><strong>Itens e anexos</strong><small>Em preenchimento</small></div></div><div class="step"><span>3</span><div><strong>Revisão</strong><small>Submissão</small></div></div></div>
+<div class="content-grid request-layout">
+  <section>
+    <div class="notice"><span>i</span><div><strong>Como preencher</strong><p>A quantidade deve corresponder à unidade indicada no item. Os detalhes do período, designação ou atividade serão conferidos no documento anexado.</p></div></div>
+    <div class="accordion-list">
+    {% for requisito in requisitos %}
+      <details class="requirement-card" {% if forloop.first %}open{% endif %}>
+        <summary><span class="requirement-code">{{ requisito.codigo }}</span><span class="requirement-title"><strong>{{ requisito.nome }}</strong><small>{{ requisito.descricao }}</small></span><span class="chevron">⌄</span></summary>
+        <div class="requirement-body">
+        {% for item in requisito.itens.all %}{% if item.ativo %}
+          <article class="score-item {% if item.lancamento_atual %}filled{% endif %}" id="item-{{ item.uuid }}">
+            <div class="score-item-heading"><div><span class="item-code">{{ item.codigo }}</span><h3>{{ item.descricao }}</h3><p><strong>{{ item.pontos_por_quantidade }} pontos</strong> por {{ item.unidade|lower }}{% if item.limite_pontos %} · limite de {{ item.limite_pontos }} pontos{% endif %}</p></div>{% if item.lancamento_atual %}<span class="badge badge-complete">Preenchido</span>{% endif %}</div>
+            <form method="post" enctype="multipart/form-data" action="{% url 'requerimentos:salvar-item' requerimento.uuid item.uuid %}" class="item-form" data-item-form data-points="{{ item.pontos_por_quantidade }}" data-limit="{{ item.limite_pontos|default_if_none:'' }}">{% csrf_token %}
+              <div class="item-fields"><div class="form-group compact"><label>Quantidade</label><input name="quantidade" type="number" min="0.01" step="{% if item.tipo_quantidade == 'INTEIRA' %}1{% else %}0.01{% endif %}" value="{% if item.lancamento_atual %}{{ item.lancamento_atual.quantidade_declarada }}{% endif %}" required><small>{{ item.unidade }}</small></div><div class="score-preview"><small>Pontuação calculada</small><strong data-score-output>{% if item.lancamento_atual %}{{ item.lancamento_atual.pontuacao_declarada }}{% else %}0,00{% endif %}</strong><span>pontos</span></div></div>
+              <div class="form-group"><label>Comprovantes {% if item.exige_anexo %}<span class="required">obrigatório</span>{% endif %}</label><label class="dropzone"><input name="documentos" type="file" multiple><span>⇧</span><strong>Clique para selecionar os arquivos</strong><small>PDF, imagens e documentos de até 50 MB</small></label></div>
+              {% if item.lancamento_atual and item.lancamento_atual.documentos.all %}<div class="file-list">{% for doc in item.lancamento_atual.documentos.all %}{% if doc.ativo %}<div class="file-row"><span class="file-icon">▤</span><span><strong>{{ doc.nome_original }}</strong><small>{{ doc.tamanho_bytes|filesizeformat }}</small></span><button type="submit" class="file-remove" form="remove-doc-{{ doc.uuid }}" title="Remover">×</button></div>{% endif %}{% endfor %}</div>{% endif %}
+              <div class="form-group"><label>Observação <em>opcional</em></label><textarea name="observacao" rows="2" placeholder="Inclua apenas informações que ajudem na conferência do comprovante.">{% if item.lancamento_atual %}{{ item.lancamento_atual.observacao }}{% endif %}</textarea></div>
+              <div class="item-actions">{% if item.lancamento_atual %}<button type="submit" class="button button-danger-ghost" form="remove-item-{{ item.uuid }}">Remover item</button>{% endif %}<button class="button button-secondary" type="submit">Salvar item</button></div>
+              <div class="form-feedback" aria-live="polite"></div>
+            </form>
+            {% if item.lancamento_atual %}<form id="remove-item-{{ item.uuid }}" method="post" action="{% url 'requerimentos:remover-item' requerimento.uuid item.uuid %}">{% csrf_token %}</form>{% endif %}
+            {% if item.lancamento_atual %}{% for doc in item.lancamento_atual.documentos.all %}<form id="remove-doc-{{ doc.uuid }}" method="post" action="{% url 'requerimentos:remover-documento' requerimento.uuid doc.uuid %}">{% csrf_token %}</form>{% endfor %}{% endif %}
+          </article>
+        {% endif %}{% endfor %}
+        </div>
+      </details>
+    {% endfor %}
+    </div>
+  </section>
+  <aside class="request-summary">
+    <div class="card sticky-card"><span class="eyebrow">Resumo do requerimento</span><h2>{{ requerimento.numero }}</h2><div class="summary-level"><small>Nível pretendido</small><strong>{{ requerimento.nivel_pretendido }}</strong></div><div class="score-total"><small>Pontuação declarada</small><strong data-request-total>{{ requerimento.pontuacao_declarada }}</strong><span>pontos</span></div><div class="progress"><span style="width: {{ requerimento.percentual_meta }}%"></span></div><div class="summary-list"><div><span>Meta do nível</span><strong>{{ requerimento.nivel_pretendido.pontuacao_minima }} pts</strong></div><div><span>Itens preenchidos</span><strong>{{ requerimento.quantidade_itens }}</strong></div><div><span>Documentos</span><strong>{{ requerimento.quantidade_documentos }}</strong></div><div><span>Vínculo</span><strong>SIAPE {{ requerimento.vinculo.siape }}</strong></div></div><a class="button button-primary button-block" href="{% url 'requerimentos:revisao' requerimento.uuid %}">Revisar requerimento →</a><a class="button button-link button-block" href="{% url 'requerimentos:lista' %}">Salvar e sair</a></div>
+  </aside>
+</div>
+{% endblock %}

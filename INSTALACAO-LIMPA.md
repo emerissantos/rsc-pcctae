@@ -1,4 +1,4 @@
-# Instalação limpa — RSC-PCCTAE 0.4.2
+# Instalação limpa — RSC-PCCTAE 0.5.0
 
 ## 1. Remover o ambiente anterior
 
@@ -15,8 +15,8 @@ Depois, remova a pasta antiga e extraia o novo pacote.
 ## 2. Preparar o novo projeto
 
 ```bash
-unzip rsc-pcctae-v0.4.2.zip
-cd rsc-pcctae-v0.4.2/rsc-pcctae
+unzip rsc-pcctae-v0.5.0.zip
+cd rsc-pcctae-v0.5.0/rsc-pcctae
 cp .env.example .env
 ```
 

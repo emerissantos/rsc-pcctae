@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.5.0 — triagem documental
+
+- criada fila de triagem para administradores e membros vigentes da comissão;
+- associação automática do requerimento à comissão vigente na submissão;
+- criado checklist de triagem configurável e sem dependência de ciclos;
+- preservados snapshots dos itens do checklist em cada rodada;
+- implementados resultados conforme, não conforme e não aplicável;
+- implementado encaminhamento para análise quando não há pendências;
+- implementada devolução ao servidor para correção;
+- prazo de correção configurável em 10, 30 ou 90 dias;
+- prazo registrado como snapshot sem ação automática no vencimento;
+- orientação consolidada obrigatória quando houver pendência;
+- nova submissão após correção preserva a comissão e cria histórico correto;
+- permissões consideram vigência da comissão e do mandato do membro;
+- menu de triagem exibido somente para usuários autorizados;
+- corrigidos metadados de versão do pacote.
+
+## 0.4.4
+
+- confirmação obrigatória antes de remover item, comprovante salvo ou upload temporário;
+- mensagens explícitas de irreversibilidade;
+- falha na exclusão assíncrona mantém o arquivo na tela.
+
+## 0.4.3
+
+- upload assíncrono imediato com progresso por arquivo;
+- armazenamento temporário por até 24 horas;
+- múltiplos comprovantes por item e limpeza de temporários abandonados.
+
 ## 0.4.2
 
 - Estrutura física dos comprovantes simplificada para `requerimentos/<numero>/requisito-<codigo>/item-<codigo>/`.

@@ -10,6 +10,8 @@ from apps.pontuacao.models import (
     Requisito,
 )
 from apps.pontuacao.seed_data import ITENS, NIVEIS, REQUISITOS
+from apps.triagem.models import ConfiguracaoTriagem, ItemChecklistTriagem
+from apps.triagem.seed_data import CHECKLIST_TRIAGEM
 
 
 class Command(BaseCommand):
@@ -73,9 +75,24 @@ class Command(BaseCommand):
                 ]
             )
 
+        for data in CHECKLIST_TRIAGEM:
+            ItemChecklistTriagem.objects.update_or_create(
+                codigo=data["codigo"],
+                defaults={
+                    "titulo": data["titulo"],
+                    "descricao": data["descricao"],
+                    "ordem": data["ordem"],
+                    "obrigatorio": True,
+                    "confere_comprovantes": data["confere_comprovantes"],
+                    "ativo": True,
+                },
+            )
+        ConfiguracaoTriagem.carregar()
+
         self.stdout.write(
             self.style.SUCCESS(
                 "Seed concluída: "
-                f"{len(REQUISITOS)} requisitos, {len(ITENS)} itens e {len(NIVEIS)} níveis."
+                f"{len(REQUISITOS)} requisitos, {len(ITENS)} itens, {len(NIVEIS)} níveis "
+                f"e {len(CHECKLIST_TRIAGEM)} itens de triagem."
             )
         )

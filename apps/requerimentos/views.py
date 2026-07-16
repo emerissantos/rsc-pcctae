@@ -11,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files import File
 from django.db import transaction
+from django.db.models import Q
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -33,11 +34,18 @@ def _requerimento_do_usuario(request, uuid, *, editavel=False) -> Requerimento:
     requerimento = get_object_or_404(queryset, uuid=uuid)
 
     eh_requerente = requerimento.requerente_id == request.user.id
+    hoje = timezone.localdate()
     eh_membro_comissao = bool(
         requerimento.comissao_id
         and request.user.participacoes_comissoes.filter(
             comissao_id=requerimento.comissao_id,
             ativo=True,
+            inicio_mandato__lte=hoje,
+            comissao__ativa=True,
+            comissao__inicio_vigencia__lte=hoje,
+        ).filter(
+            Q(fim_mandato__isnull=True) | Q(fim_mandato__gte=hoje),
+            Q(comissao__fim_vigencia__isnull=True) | Q(comissao__fim_vigencia__gte=hoje),
         ).exists()
     )
     pode_visualizar = request.user.is_staff or eh_requerente or eh_membro_comissao
@@ -95,6 +103,7 @@ def criar(request):
 @login_required
 def detalhe(request, uuid):
     requerimento = _requerimento_do_usuario(request, uuid)
+    requerimento.ultima_triagem_atual = requerimento.ultima_triagem
     lancamentos = requerimento.lancamentos.select_related("item__requisito").prefetch_related(
         "documentos"
     )

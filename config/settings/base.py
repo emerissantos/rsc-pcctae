@@ -28,6 +28,7 @@ LOCAL_APPS = [
     "apps.pontuacao.apps.PontuacaoConfig",
     "apps.comissoes.apps.ComissoesConfig",
     "apps.requerimentos.apps.RequerimentosConfig",
+    "apps.triagem.apps.TriagemConfig",
     "apps.auditoria.apps.AuditoriaConfig",
 ]
 
@@ -57,6 +58,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.triagem.context_processors.permissoes_triagem",
             ],
         },
     },

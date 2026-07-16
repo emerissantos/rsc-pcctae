@@ -7,7 +7,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
@@ -144,23 +144,51 @@ class Requerimento(UUIDPublicModel, AuditModel):
             )
         return erros
 
+    @property
+    def ultima_triagem(self):
+        return self.triagens.order_by("-rodada").first()
+
     @transaction.atomic
     def submeter(self, usuario=None) -> None:
         if not self.pode_editar:
             raise ValidationError("Este requerimento não pode mais ser submetido.")
+        situacao_anterior = self.situacao
         self.recalcular_pontuacao()
         erros = self.validar_submissao()
         if erros:
             raise ValidationError(erros)
+        if not self.comissao_id:
+            from apps.comissoes.models import Comissao
+
+            hoje = timezone.localdate()
+            self.comissao = (
+                Comissao.objects.filter(ativa=True, inicio_vigencia__lte=hoje)
+                .filter(Q(fim_vigencia__isnull=True) | Q(fim_vigencia__gte=hoje))
+                .order_by("-inicio_vigencia", "-pk")
+                .first()
+            )
         self.situacao = self.Situacao.SUBMETIDO
         self.submetido_em = timezone.now()
         self.updated_by = usuario if getattr(usuario, "is_authenticated", False) else None
-        self.save(update_fields=["situacao", "submetido_em", "updated_by", "updated_at"])
+        self.save(
+            update_fields=[
+                "comissao",
+                "situacao",
+                "submetido_em",
+                "updated_by",
+                "updated_at",
+            ]
+        )
+        descricao = (
+            "Correções submetidas pelo servidor para nova triagem."
+            if situacao_anterior == self.Situacao.PENDENTE_CORRECAO
+            else "Requerimento submetido pelo servidor."
+        )
         HistoricoRequerimento.objects.create(
             requerimento=self,
-            situacao_anterior=self.Situacao.RASCUNHO,
+            situacao_anterior=situacao_anterior,
             situacao_nova=self.Situacao.SUBMETIDO,
-            descricao="Requerimento submetido pelo servidor.",
+            descricao=descricao,
             created_by=self.updated_by,
             updated_by=self.updated_by,
         )

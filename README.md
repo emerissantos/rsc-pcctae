@@ -1,6 +1,6 @@
 # Sistema RSC-PCCTAE — UFSB
 
-Versão **0.4.4**, com upload funcional e documentos privados.
+Versão **0.5.0**, com fluxo de triagem documental pela comissão.
 
 ## Escopo desta versão
 
@@ -17,6 +17,10 @@ O sistema foi simplificado para o fluxo operacional do RSC-PCCTAE:
 - múltiplos anexos por item;
 - observação opcional;
 - revisão e submissão;
+- distribuição automática para a comissão vigente;
+- fila de triagem para membros ativos da comissão;
+- checklist configurável com histórico por snapshots;
+- devolução para correção com prazo configurável de 10, 30 ou 90 dias;
 - snapshots da regra usada no lançamento, preservando o histórico;
 - interface responsiva inspirada nas capturas de referência fornecidas.
 
@@ -56,13 +60,13 @@ Os arquivos são armazenados internamente no padrão:
 
 ```text
 requerimentos/
-└── siape-<SIAPE>/
-    └── <AAAAMMDD>/
-        └── <NUMERO-DO-REQUERIMENTO>/
-            └── requisito-<CODIGO>/
-                └── item-<CODIGO>/
-                    └── <UUID>_<nome-normalizado>.<extensão>
+└── <NUMERO-DO-REQUERIMENTO>/
+    └── requisito-<CODIGO>/
+        └── item-<CODIGO>/
+            └── <UUID>-<nome-normalizado>.<extensão>
 ```
+
+O caminho físico não contém SIAPE, CPF ou outro identificador funcional do servidor.
 
 Não existe acesso direto por `/media/` ou por URL do storage. O usuário clica no documento dentro do sistema; a aplicação verifica sessão e permissão antes de entregar o conteúdo. Em produção, o Nginx usa uma localização `internal`, inacessível diretamente pela internet.
 
@@ -78,6 +82,23 @@ Membros da comissão podem consultar, mas não editar os itens declarados pelo s
 
 Itens configurados como inteiros aceitam somente `1`, `2`, `3` etc. A interface bloqueia separadores decimais, inclusive no Firefox, e o backend repete a validação. Portanto, valores como `1.01` ou `1,5` são rejeitados mesmo que o navegador tente enviá-los.
 
+
+## Fluxo de triagem
+
+Após a submissão, o sistema associa o requerimento à comissão vigente. O acesso à fila é permitido a usuários administrativos e a membros com comissão e mandato ativos.
+
+A triagem funciona por rodadas:
+
+1. o membro inicia a triagem;
+2. o sistema cria o checklist ativo com snapshots dos textos e regras;
+3. cada item é marcado como conforme, não conforme ou não aplicável;
+4. havendo pendência, a orientação consolidada é obrigatória;
+5. o requerimento retorna ao servidor como **Pendente de correção**;
+6. o servidor ajusta os itens e submete novamente, iniciando nova rodada;
+7. sem pendências, o requerimento segue para **Em análise**.
+
+O prazo para correção é definido em **Administração → Configurações da triagem** e pode ser de 10, 30 ou 90 dias. O vencimento não altera automaticamente a situação do processo; a gestão permanece com a presidência da comissão.
+
 ## Requisitos técnicos
 
 - Docker 24 ou superior;
@@ -91,8 +112,8 @@ Itens configurados como inteiros aceitam somente `1`, `2`, `3` etc. A interface 
 ### 1. Extraia o projeto
 
 ```bash
-unzip rsc-pcctae-v0.4.4.zip
-cd rsc-pcctae-v0.4.4/rsc-pcctae
+unzip rsc-pcctae-v0.5.0.zip
+cd rsc-pcctae-v0.5.0/rsc-pcctae
 ```
 
 ### 2. Crie o `.env`
@@ -212,6 +233,7 @@ apps/
 ├── pontuacao/       níveis, requisitos, itens e seed
 ├── comissoes/       comissões e membros
 ├── requerimentos/   pedidos, lançamentos, anexos e histórico
+├── triagem/          checklist, prazos e encaminhamento à análise
 ├── auditoria/       base para eventos de auditoria
 └── core/            infraestrutura comum e dashboard
 ```

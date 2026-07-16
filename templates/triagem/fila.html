@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Fila de triagem — RSC-PCCTAE{% endblock %}
+{% block page_title %}Triagem{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><span class="eyebrow">Comissão</span><h1>Fila de triagem</h1><p>Confira a instrução documental antes de encaminhar o requerimento para análise.</p></div>
+</div>
+<div class="card table-card responsive-table">
+  <table>
+    <thead><tr><th>Requerimento</th><th>Servidor</th><th>Nível</th><th>Comissão</th><th>Situação</th><th>Ação</th></tr></thead>
+    <tbody>
+      {% for requerimento in requerimentos %}
+      <tr>
+        <td><strong>{{ requerimento.numero }}</strong><small>Submetido em {{ requerimento.submetido_em|date:'d/m/Y H:i'|default:'—' }}</small></td>
+        <td>{{ requerimento.requerente }}<small>SIAPE {{ requerimento.vinculo.siape }}</small></td>
+        <td>{{ requerimento.nivel_pretendido }}</td>
+        <td>{{ requerimento.comissao|default:'Aguardando distribuição' }}</td>
+        <td><span class="badge badge-{{ requerimento.situacao|lower }}">{{ requerimento.get_situacao_display }}</span></td>
+        <td>
+          {% if requerimento.situacao == 'SUBMETIDO' %}
+          <form method="post" action="{% url 'triagem:iniciar' requerimento.uuid %}">{% csrf_token %}<button class="button button-primary button-sm" type="submit">Iniciar triagem</button></form>
+          {% elif requerimento.situacao == 'EM_TRIAGEM' and requerimento.triagens.first %}
+          <a class="button button-secondary button-sm" href="{% url 'triagem:detalhe' requerimento.triagens.first.uuid %}">Continuar</a>
+          {% else %}
+          <a class="button button-ghost button-sm" href="{{ requerimento.get_absolute_url }}">Ver requerimento</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6"><div class="empty-state"><span>✓</span><h3>Fila sem requerimentos</h3><p>Não há processos aguardando atuação da triagem.</p></div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

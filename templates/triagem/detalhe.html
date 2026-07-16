@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Triagem {{ triagem.requerimento.numero }} — RSC-PCCTAE{% endblock %}
+{% block page_title %}Triagem documental{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><span class="eyebrow">Rodada {{ triagem.rodada }}</span><h1>{{ triagem.requerimento.numero }}</h1><p>{{ triagem.requerimento.requerente }} · SIAPE {{ triagem.requerimento.vinculo.siape }} · {{ triagem.requerimento.nivel_pretendido }}</p></div>
+  <span class="badge large {% if triagem.resultado == 'APTO' %}badge-deferido{% elif triagem.resultado == 'PENDENCIA' %}badge-pendente_correcao{% else %}badge-em_triagem{% endif %}">{{ triagem.get_resultado_display }}</span>
+</div>
+<div class="content-grid request-layout">
+  <section>
+    <form method="post" id="triagem-form">{% csrf_token %}
+      <div class="card">
+        <div class="card-header"><div><span class="eyebrow">Checklist obrigatório</span><h2>Conferência da instrução</h2></div><small>Responsável inicial: {{ triagem.responsavel }}</small></div>
+        <div class="checklist-list">
+          {% for verificacao, form in formularios %}
+          <article class="checklist-row">
+            <div class="checklist-copy"><span class="item-code">{{ verificacao.item_codigo_snapshot }}</span><strong>{{ verificacao.item_titulo_snapshot }}</strong>{% if verificacao.item_descricao_snapshot %}<p>{{ verificacao.item_descricao_snapshot }}</p>{% endif %}<div>{% if verificacao.item_obrigatorio_snapshot %}<span class="badge">Obrigatório</span>{% endif %}{% if verificacao.item_confere_comprovantes_snapshot %}<span class="badge badge-submetido">Confere comprovantes</span>{% endif %}</div></div>
+            <div class="checklist-fields"><div class="form-group compact"><label for="{{ form.situacao.id_for_label }}">Resultado</label>{{ form.situacao }}</div><div class="form-group compact"><label for="{{ form.observacao.id_for_label }}">Observação</label>{{ form.observacao }}</div></div>
+          </article>
+          {% empty %}<div class="alert alert-warning">Nenhum item de checklist ativo. Execute a seed ou cadastre os itens no painel administrativo.</div>{% endfor %}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div><span class="eyebrow">Correção</span><h2>Orientações consolidadas</h2></div></div>
+        <div class="form-group"><label for="{{ conclusao_form.orientacao_correcao.id_for_label }}">Orientação ao servidor</label>{{ conclusao_form.orientacao_correcao }}<small>Obrigatória quando houver item marcado como não conforme. O prazo configurado é aplicado na conclusão.</small></div>
+        {% if triagem.em_andamento %}<div class="form-actions"><button class="button button-ghost" type="submit" formaction="{% url 'triagem:salvar' triagem.uuid %}">Salvar triagem</button><button class="button button-primary" type="submit" formaction="{% url 'triagem:concluir' triagem.uuid %}" data-confirm="Concluir esta triagem? O requerimento será encaminhado para análise ou devolvido para correção conforme o checklist.">Concluir triagem</button></div>{% endif %}
+      </div>
+    </form>
+    <div class="card"><div class="card-header"><div><span class="eyebrow">Memória apresentada</span><h2>Itens e comprovantes</h2></div><a href="{{ triagem.requerimento.get_absolute_url }}">Abrir requerimento</a></div><div class="review-list">{% for lancamento in lancamentos %}<article><div><span class="item-code">{{ lancamento.item_codigo_snapshot }}</span><strong>{{ lancamento.item_descricao_snapshot }}</strong><small>Quantidade {{ lancamento.quantidade_declarada }} · {{ lancamento.documentos.count }} documento(s)</small><div class="review-files">{% for doc in lancamento.documentos.all %}{% if doc.ativo %}<a href="{% url 'requerimentos:baixar-documento' triagem.requerimento.uuid doc.uuid %}">▤ {{ doc.nome_original }}</a>{% endif %}{% endfor %}</div></div><strong class="review-score">{{ lancamento.pontuacao_declarada }} pts</strong></article>{% empty %}<div class="empty-state compact"><p>Nenhum item declarado.</p></div>{% endfor %}</div></div>
+  </section>
+  <aside class="request-summary"><div class="card sticky-card"><span class="eyebrow">Processo</span><div class="summary-list"><div><span>Situação</span><strong>{{ triagem.requerimento.get_situacao_display }}</strong></div><div><span>Comissão</span><strong>{{ triagem.requerimento.comissao }}</strong></div><div><span>Pontuação</span><strong>{{ triagem.requerimento.pontuacao_declarada }}</strong></div><div><span>Itens</span><strong>{{ triagem.requerimento.quantidade_itens }}</strong></div><div><span>Documentos</span><strong>{{ triagem.requerimento.quantidade_documentos }}</strong></div></div>{% if triagem.prazo_correcao_ate %}<div class="alert alert-warning"><strong>Correção até {{ triagem.prazo_correcao_ate|date:'d/m/Y' }}</strong><br>Prazo registrado na conclusão desta rodada.</div>{% endif %}<p class="fine-print">O vencimento do prazo não produz ação automática. A gestão permanece sob responsabilidade da presidência da comissão.</p></div></aside>
+</div>
+{% endblock %}

@@ -23,6 +23,7 @@
       <a href="{% url 'requerimentos:lista' %}" class="{% if request.resolver_match.namespace == 'requerimentos' %}active{% endif %}"><span>▣</span> Meus requerimentos</a>
       <a href="{% url 'requerimentos:criar' %}"><span>＋</span> Novo requerimento</a>
       <a href="{% url 'pontuacao:tabela' %}" class="{% if request.resolver_match.namespace == 'pontuacao' %}active{% endif %}"><span>∑</span> Requisitos e itens</a>
+      {% if pode_acessar_triagem %}<a href="{% url 'triagem:fila' %}" class="{% if request.resolver_match.namespace == 'triagem' %}active{% endif %}"><span>✓</span> Triagem</a>{% endif %}
       {% if request.user.is_staff %}
       <div class="nav-label">Administração</div>
       <a href="{% url 'admin:index' %}"><span>⚙</span> Cadastros</a>

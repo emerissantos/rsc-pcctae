@@ -7,6 +7,7 @@ urlpatterns = [
     path("autenticacao/", include("apps.contas.urls")),
     path("pontuacao/", include("apps.pontuacao.urls")),
     path("requerimentos/", include("apps.requerimentos.urls")),
+    path("triagem/", include("apps.triagem.urls")),
 ]
 
 # Arquivos enviados pelos usuários são privados. Eles nunca são expostos por

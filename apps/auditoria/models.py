@@ -29,6 +29,10 @@ class EventoAuditoria(UUIDPublicModel, TimeStampedModel):
         LOGOUT = "LOGOUT", "Logout realizado"
         ACESSO_NEGADO = "ACESSO_NEGADO", "Acesso negado"
         REQUERIMENTO_VISUALIZADO = "REQUERIMENTO_VISUALIZADO", "Requerimento visualizado"
+        DADOS_FUNCIONAIS_VISUALIZADOS = (
+            "DADOS_FUNCIONAIS_VISUALIZADOS",
+            "Dados funcionais visualizados",
+        )
         IMPORTACAO_USUARIO_SIG = "IMPORTACAO_USUARIO_SIG", "Importação de usuário do SIG"
         CADASTRO_CRIADO = "CADASTRO_CRIADO", "Cadastro criado"
         CADASTRO_ALTERADO = "CADASTRO_ALTERADO", "Cadastro alterado"

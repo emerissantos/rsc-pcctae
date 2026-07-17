@@ -1,6 +1,6 @@
 # Sistema RSC-PCCTAE — UFSB
 
-Versão **0.8.2**, com auditoria transversal de autenticação, acessos, cadastros, requerimentos, documentos e triagens.
+Versão **0.8.3**, com auditoria transversal de autenticação, acessos, cadastros, requerimentos, documentos e triagens.
 
 ## Escopo desta versão
 
@@ -33,6 +33,7 @@ O sistema foi simplificado para o fluxo operacional do RSC-PCCTAE:
 - detalhe de cada evento com ator real, usuário afetado, IP, request ID, objeto e comparação dos dados;
 - geração do formulário F-00 em DOCX editável, preenchido com dados funcionais, itens, pontuação e comprovantes;
 - interface responsiva inspirada nas capturas de referência fornecidas.
+- página de conferência dos dados funcionais e vínculos sincronizados.
 
 Não há módulo de normas, versões normativas, matrizes ou ciclos de avaliação.
 

@@ -3,7 +3,7 @@
 {% block page_title %}Visão geral{% endblock %}
 {% block content %}
 <section class="hero-card">
-  <div><span class="eyebrow orange">Reconhecimento de Saberes e Competências</span><h1>Olá, {{ request.user.nome_exibicao|default:request.user.username }}.</h1><p>Crie seu requerimento, informe os itens por quantidade e acompanhe cada etapa em um só lugar.</p></div>
+  <div><span class="eyebrow orange">Reconhecimento de Saberes e Competências</span><h1>Olá, <a class="profile-name-link" href="{% url 'core:meus-dados' %}" title="Conferir meus dados funcionais">{{ request.user.nome_exibicao|default:request.user.username }}</a>.</h1><p>Crie seu requerimento, informe os itens por quantidade e acompanhe cada etapa em um só lugar. <a class="inline-profile-link" href="{% url 'core:meus-dados' %}">Conferir meus dados funcionais</a>.</p></div>
   <a class="button button-primary" href="{% url 'requerimentos:criar' %}">＋ Novo requerimento</a>
 </section>
 <div class="metric-grid">

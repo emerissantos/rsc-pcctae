@@ -1,27 +1,23 @@
-RSC-PCCTAE 0.8.2 — VALIDAÇÃO
+RSC-PCCTAE 0.8.3 — VALIDAÇÃO
+
+Data: 2026-07-17
 
 Resultado:
 - Django system check: aprovado
 - makemigrations --check --dry-run: nenhuma alteração pendente
-- pytest: 81 testes aprovados
+- pytest: 87 testes aprovados
 - Ruff: aprovado
 - compilação Python: aprovada
 
-Cenários validados:
-- membro ativo não visualiza o próprio requerimento na fila;
-- membro ativo recebe 403 ao iniciar triagem do próprio requerimento;
-- operador com permissões explícitas recebe 403 no próprio requerimento;
-- superusuário recebe 403 no próprio requerimento;
-- requerente não abre a tela operacional de triagem já iniciada;
-- requerente não salva nem conclui a própria triagem;
-- situação e conteúdo da triagem permanecem inalterados após tentativas bloqueadas;
-- requerente continua consultando o próprio requerimento pela área pessoal;
-- demais membros e operadores continuam atuando normalmente em processos de terceiros;
-- bloqueios 403 permanecem cobertos pela auditoria transversal.
-
-Pacotes:
-- versão completa extraída e validada novamente
-- atualização incremental aplicada sobre a 0.8.1 e validada novamente
-- 249 arquivos comparados e idênticos entre a versão completa e a atualizada
-- integridade dos dois arquivos ZIP: aprovada
-- hashes SHA-256: confirmados
+Funcionalidades validadas nesta versão:
+- nome e e-mail da área autenticada direcionam para Meus dados funcionais;
+- nome da saudação da página inicial também direciona para a tela;
+- consulta exclusiva dos dados do próprio usuário autenticado;
+- identificação institucional, conta externa e cadastro consolidado do servidor;
+- exibição de múltiplos vínculos ativos e inativos;
+- SIAPE, cargo, lotação, exercício, regime e data de admissão;
+- funcionamento seguro quando a sincronização ainda não existe;
+- orientação para procurar o setor de cadastro funcional da Progepe;
+- auditoria DADOS_FUNCIONAIS_VISUALIZADOS com ator, usuário, IP e contagem de vínculos;
+- migration do novo tipo de evento de auditoria;
+- layout responsivo com cards e detalhes técnicos recolhíveis.

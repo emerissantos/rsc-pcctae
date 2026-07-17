@@ -31,7 +31,7 @@
       {% if request.user.is_superuser %}<a href="{% url 'admin:index' %}"><span>⚙</span> Administração técnica</a>{% endif %}
     </nav>
     <div class="sidebar-footer">
-      <div class="user-chip"><span class="avatar">{{ request.user.username|first|upper }}</span><span><strong>{{ request.user }}</strong><small>{{ request.user.email|default:'Usuário autenticado' }}</small></span></div>
+      <a class="user-chip user-chip-link" href="{% url 'core:meus-dados' %}" title="Conferir meus dados funcionais"><span class="avatar">{{ request.user.username|first|upper }}</span><span><strong>{{ request.user }}</strong><small>{{ request.user.email|default:'Usuário autenticado' }}</small></span></a>
       <form method="post" action="{% url 'contas:logout' %}">{% csrf_token %}<button class="link-button" type="submit">Sair do sistema</button></form>
     </div>
   </aside>

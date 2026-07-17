@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block title %}Meus dados funcionais — RSC-PCCTAE{% endblock %}
+{% block page_title %}Meus dados funcionais{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">Perfil institucional</span>
+    <h1>Confira seus dados funcionais</h1>
+    <p>Estas informações são obtidas dos sistemas institucionais e utilizadas nos requerimentos do RSC-PCCTAE.</p>
+  </div>
+  <a class="button button-ghost" href="{% url 'core:home' %}">← Voltar à visão geral</a>
+</div>
+
+<div class="notice functional-data-notice" role="note">
+  <span>i</span>
+  <div>
+    <strong>Dados disponíveis somente para conferência</strong>
+    <p>O RSC-PCCTAE não permite editar os dados funcionais nesta tela. Caso encontre alguma divergência, entre em contato com o setor responsável pelo cadastro funcional da <strong>Pró-Reitoria de Gestão para Pessoas — Progepe</strong>.</p>
+  </div>
+</div>
+
+{% with dados=dados_funcionais identidade=dados_funcionais.identidade pessoa=dados_funcionais.pessoa servidor=dados_funcionais.servidor %}
+<section class="functional-profile-card card">
+  <div class="functional-profile-avatar">{{ request.user.nome_exibicao|default:request.user.username|first|upper }}</div>
+  <div class="functional-profile-copy">
+    <span class="eyebrow">Servidor autenticado</span>
+    <h2>{{ apresentacao.nome_principal }}</h2>
+    <p>{{ apresentacao.email_principal }}</p>
+  </div>
+  <div class="functional-profile-status">
+    {% if servidor %}
+      {% if servidor.ativo %}<span class="badge badge-deferido">Servidor ativo</span>{% else %}<span class="badge badge-cancelado">Servidor inativo</span>{% endif %}
+    {% elif identidade %}
+      {% if identidade.ativo_na_origem %}<span class="badge badge-deferido">Conta ativa na origem</span>{% else %}<span class="badge badge-cancelado">Conta inativa na origem</span>{% endif %}
+    {% else %}
+      <span class="badge badge-pendente_correcao">Sincronização incompleta</span>
+    {% endif %}
+  </div>
+</section>
+
+{% if identidade or pessoa or servidor %}
+<div class="content-grid functional-data-grid">
+  <article class="card">
+    <div class="card-header">
+      <div><span class="eyebrow">Identificação</span><h2>Dados institucionais</h2></div>
+    </div>
+    <dl class="detail-grid functional-detail-grid">
+      <div><dt>Nome</dt><dd>{{ apresentacao.nome_institucional }}</dd></div>
+      <div><dt>Nome de identificação</dt><dd>{{ apresentacao.nome_identificacao }}</dd></div>
+      <div><dt>Login institucional</dt><dd>{{ apresentacao.login }}</dd></div>
+      <div><dt>E-mail institucional</dt><dd>{{ apresentacao.email_institucional }}</dd></div>
+      <div><dt>ID institucional</dt><dd>{{ apresentacao.id_institucional }}</dd></div>
+      <div><dt>Situação na origem</dt><dd>{% if identidade %}{% if identidade.ativo_na_origem %}Ativa{% else %}Inativa{% endif %}{% else %}Não informada{% endif %}</dd></div>
+      <div><dt>Último login institucional</dt><dd>{{ identidade.ultimo_login_em|date:'d/m/Y H:i'|default:'Não informado' }}</dd></div>
+      <div><dt>Última sincronização</dt><dd>{{ apresentacao.ultima_sincronizacao|date:'d/m/Y H:i'|default:'Não informada' }}</dd></div>
+    </dl>
+  </article>
+
+  <article class="card">
+    <div class="card-header">
+      <div><span class="eyebrow">Servidor</span><h2>Cadastro funcional consolidado</h2></div>
+    </div>
+    {% if servidor %}
+    <dl class="detail-grid functional-detail-grid">
+      <div><dt>Nome atual</dt><dd>{{ servidor.nome_atual }}</dd></div>
+      <div><dt>Nome de identificação atual</dt><dd>{{ servidor.nome_identificacao_atual|default:'Não informado' }}</dd></div>
+      <div><dt>E-mail atual</dt><dd>{{ servidor.email_atual|default:'Não informado' }}</dd></div>
+      <div><dt>Situação</dt><dd>{% if servidor.ativo %}Ativo{% else %}Inativo{% endif %}</dd></div>
+      <div><dt>Última sincronização</dt><dd>{{ servidor.ultima_sincronizacao_em|date:'d/m/Y H:i'|default:'Não informada' }}</dd></div>
+      <div><dt>Quantidade de vínculos</dt><dd>{{ dados.vinculos|length }}</dd></div>
+    </dl>
+    {% else %}
+    <div class="empty-state compact">
+      <span>!</span><h3>Cadastro de servidor não localizado</h3>
+      <p>A identidade institucional foi encontrada, mas os dados funcionais ainda não estão disponíveis nesta base.</p>
+    </div>
+    {% endif %}
+  </article>
+</div>
+{% else %}
+<section class="card empty-state functional-empty-state">
+  <span>!</span>
+  <h2>Dados funcionais ainda não sincronizados</h2>
+  <p>A conta está autenticada, mas não foi possível localizar a pessoa institucional e o cadastro funcional correspondente.</p>
+</section>
+{% endif %}
+
+<section class="card functional-links-card">
+  <div class="card-header">
+    <div>
+      <span class="eyebrow">Vínculos funcionais</span>
+      <h2>Registros associados ao servidor</h2>
+      <p class="card-subtitle">Confira o SIAPE, cargo, lotação, unidade de exercício e demais dados de cada vínculo.</p>
+    </div>
+    <span class="badge">{{ dados.vinculos|length }} vínculo{{ dados.vinculos|length|pluralize }}</span>
+  </div>
+  {% if dados.vinculos %}
+  <div class="functional-link-list">
+    {% for vinculo in dados.vinculos %}
+    <article class="functional-link-item {% if not vinculo.ativo %}is-inactive{% endif %}">
+      <div class="functional-link-heading">
+        <div>
+          <span class="eyebrow">Matrícula SIAPE</span>
+          <h3>{{ vinculo.siape }}{% if vinculo.digito_siape %}-{{ vinculo.digito_siape }}{% endif %}</h3>
+        </div>
+        {% if vinculo.ativo %}<span class="badge badge-deferido">Vínculo ativo</span>{% else %}<span class="badge badge-cancelado">Vínculo inativo</span>{% endif %}
+      </div>
+      <dl class="detail-grid functional-link-grid">
+        <div><dt>Cargo</dt><dd>{{ vinculo.cargo_nome|default:'Não informado' }}</dd></div>
+        <div><dt>Data de admissão</dt><dd>{{ vinculo.data_admissao|date:'d/m/Y'|default:'Não informada' }}</dd></div>
+        <div><dt>Lotação</dt><dd>{{ vinculo.lotacao_nome|default:'Não informada' }}</dd></div>
+        <div><dt>Unidade de exercício</dt><dd>{{ vinculo.unidade_exercicio_nome|default:'Não informada' }}</dd></div>
+        <div><dt>Regime de trabalho</dt><dd>{% if vinculo.regime_trabalho %}{{ vinculo.regime_trabalho }} horas{% else %}Não informado{% endif %}</dd></div>
+        <div><dt>Última sincronização</dt><dd>{{ vinculo.ultima_sincronizacao_em|date:'d/m/Y H:i'|default:'Não informada' }}</dd></div>
+      </dl>
+      <details class="functional-technical-data">
+        <summary>Referências técnicas para atendimento</summary>
+        <dl class="detail-grid functional-link-grid">
+          <div><dt>ID externo do servidor</dt><dd>{{ vinculo.id_servidor_externo }}</dd></div>
+          <div><dt>ID da situação</dt><dd>{{ vinculo.id_situacao_externa|default:'Não informado' }}</dd></div>
+          <div><dt>ID da categoria</dt><dd>{{ vinculo.id_categoria_externa|default:'Não informado' }}</dd></div>
+          <div><dt>ID do cargo</dt><dd>{{ vinculo.id_cargo_externo|default:'Não informado' }}</dd></div>
+        </dl>
+      </details>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state compact">
+    <span>▣</span><h3>Nenhum vínculo funcional disponível</h3>
+    <p>Não foram localizados vínculos associados ao cadastro do servidor.</p>
+  </div>
+  {% endif %}
+</section>
+
+<div class="notice functional-contact-notice" role="note">
+  <span>✓</span>
+  <div>
+    <strong>Encontrou uma informação incorreta?</strong>
+    <p>Anote o dado divergente e procure o setor responsável pelo cadastro funcional da Progepe. Após a correção no sistema de origem, as informações serão atualizadas no RSC-PCCTAE por nova sincronização institucional.</p>
+  </div>
+</div>
+{% endwith %}
+{% endblock %}

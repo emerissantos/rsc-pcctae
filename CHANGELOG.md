@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.3 — meus dados funcionais
+
+- página somente leitura com identidade, servidor e vínculos funcionais;
+- nome e e-mail da área autenticada direcionam para a conferência dos dados;
+- orientação ao servidor para procurar o cadastro funcional da Progepe em caso de divergência;
+- auditoria específica da consulta.
+
 ## 0.8.2 — impedimento de atuação no próprio requerimento
 
 - cria regra transversal de segregação de funções para etapas operacionais;

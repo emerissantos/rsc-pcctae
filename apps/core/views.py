@@ -7,6 +7,11 @@ from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
 
+from apps.auditoria.models import EventoAuditoria
+from apps.auditoria.services import registrar_evento
+
+from .profile import carregar_dados_funcionais
+
 
 @require_GET
 def home(request):
@@ -39,6 +44,87 @@ def home(request):
             "recentes": queryset[:5],
         }
     return render(request, "core/home.html", contexto)
+
+
+@require_GET
+def meus_dados(request):
+    if not request.user.is_authenticated:
+        return redirect("contas:login")
+
+    dados_funcionais = carregar_dados_funcionais(request.user)
+    objeto_auditoria = (
+        dados_funcionais.servidor
+        or dados_funcionais.pessoa
+        or dados_funcionais.identidade
+        or request.user
+    )
+    registrar_evento(
+        request,
+        tipo=EventoAuditoria.Tipo.DADOS_FUNCIONAIS_VISUALIZADOS,
+        categoria=EventoAuditoria.Categoria.ACESSO,
+        descricao=f"Dados funcionais consultados por {request.user}",
+        usuario_afetado=request.user,
+        objeto=objeto_auditoria,
+        dados={
+            "possui_identidade_externa": dados_funcionais.identidade is not None,
+            "possui_pessoa_institucional": dados_funcionais.pessoa is not None,
+            "possui_servidor": dados_funcionais.servidor is not None,
+            "quantidade_vinculos": len(dados_funcionais.vinculos),
+            "quantidade_vinculos_ativos": sum(
+                1 for vinculo in dados_funcionais.vinculos if vinculo.ativo
+            ),
+        },
+    )
+    identidade = dados_funcionais.identidade
+    pessoa = dados_funcionais.pessoa
+    servidor = dados_funcionais.servidor
+    apresentacao = {
+        "nome_principal": (
+            getattr(servidor, "nome_atual", "")
+            or getattr(pessoa, "nome", "")
+            or getattr(identidade, "nome_recebido", "")
+            or request.user.nome_exibicao
+            or request.user.username
+        ),
+        "email_principal": (
+            getattr(servidor, "email_atual", "")
+            or getattr(pessoa, "email_institucional", "")
+            or getattr(identidade, "email_recebido", "")
+            or request.user.email
+            or "E-mail institucional não informado"
+        ),
+        "nome_institucional": (
+            getattr(pessoa, "nome", "")
+            or getattr(identidade, "nome_recebido", "")
+            or request.user.nome_exibicao
+            or request.user.username
+        ),
+        "nome_identificacao": getattr(pessoa, "nome_identificacao", "") or "Não informado",
+        "login": getattr(identidade, "login", "") or request.user.username,
+        "email_institucional": (
+            getattr(pessoa, "email_institucional", "")
+            or getattr(identidade, "email_recebido", "")
+            or request.user.email
+            or "Não informado"
+        ),
+        "id_institucional": (
+            getattr(pessoa, "id_institucional", None)
+            or getattr(identidade, "id_institucional", None)
+            or "Não informado"
+        ),
+        "ultima_sincronizacao": (
+            getattr(identidade, "ultima_sincronizacao_em", None)
+            or getattr(pessoa, "sincronizado_em", None)
+        ),
+    }
+    return render(
+        request,
+        "core/meus_dados.html",
+        {
+            "dados_funcionais": dados_funcionais,
+            "apresentacao": apresentacao,
+        },
+    )
 
 
 @never_cache

@@ -10,6 +10,7 @@ ATUALIZACAO-0.7.2-para-0.7.3.md
 ATUALIZACAO-0.7.3-para-0.8.0.md
 ATUALIZACAO-0.8.0-para-0.8.1.md
 ATUALIZACAO-0.8.1-para-0.8.2.md
+ATUALIZACAO-0.8.2-para-0.8.3.md
 CHANGELOG-0.4.3.md
 CHANGELOG-0.4.4.md
 CHANGELOG-0.5.0.md
@@ -21,6 +22,7 @@ CHANGELOG-0.7.3.md
 CHANGELOG-0.8.0.md
 CHANGELOG-0.8.1.md
 CHANGELOG-0.8.2.md
+CHANGELOG-0.8.3.md
 CHANGELOG.md
 Dockerfile
 Dockerfile.prod
@@ -39,6 +41,7 @@ apps/auditoria/migrations/0001_initial.py
 apps/auditoria/migrations/0002_sessaoimpersonacao_uniq_impersonacao_ativa_ator.py
 apps/auditoria/migrations/0003_eventoauditoria_transversal.py
 apps/auditoria/migrations/0004_alter_eventoauditoria_tipo.py
+apps/auditoria/migrations/0005_alter_eventoauditoria_tipo.py
 apps/auditoria/migrations/__init__.py
 apps/auditoria/models.py
 apps/auditoria/services.py
@@ -92,11 +95,13 @@ apps/core/exceptions.py
 apps/core/logging.py
 apps/core/middleware.py
 apps/core/models.py
+apps/core/profile.py
 apps/core/services.py
 apps/core/storage.py
 apps/core/tests/__init__.py
 apps/core/tests/test_health.py
 apps/core/tests/test_logging.py
+apps/core/tests/test_meus_dados.py
 apps/core/urls.py
 apps/core/views.py
 apps/integracoes/__init__.py
@@ -210,6 +215,7 @@ docs/auditoria.md
 docs/central-cadastros.md
 docs/formulario-f00.md
 docs/integracao-ufsb.md
+docs/meus-dados-funcionais.md
 docs/modelo-simplificado-rsc.md
 docs/padroes-interface-requerimento.md
 docs/referencias-ui/tela-requerimento-1.png
@@ -235,6 +241,7 @@ templates/cadastros/lista.html
 templates/contas/impersonar_confirmar.html
 templates/contas/login.html
 templates/core/home.html
+templates/core/meus_dados.html
 templates/errors/403.html
 templates/errors/404.html
 templates/errors/500.html

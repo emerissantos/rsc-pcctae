@@ -433,13 +433,17 @@ RESOURCES: dict[str, CadastroConfig] = {
         area="auditoria-suporte",
         model=EventoAuditoria,
         title="Eventos de auditoria",
-        description="Importações e ações técnicas relevantes registradas pelo sistema.",
+        description=(
+            "Rastreabilidade de autenticação, acessos, cadastros, documentos, "
+            "requerimentos e triagens."
+        ),
         icon="A",
         columns=(
+            Column("categoria", "Categoria", "get_categoria_display", "categoria", "badge"),
             Column("tipo", "Evento", "get_tipo_display", "tipo", "badge"),
-            Column("ator", "Realizado por", "ator", "ator__username"),
-            Column("afetado", "Usuário afetado", "usuario_afetado", "usuario_afetado__username"),
-            Column("descricao", "Descrição", "descricao", "descricao", "truncate"),
+            Column("ator", "Ator real", "ator", "ator__username"),
+            Column("recurso", "Recurso", "recurso", "recurso"),
+            Column("sucesso", "Resultado", "sucesso", "sucesso", "bool"),
             Column("data", "Registrado em", "created_at", "created_at", "datetime"),
         ),
         search_fields=(
@@ -449,8 +453,17 @@ RESOURCES: dict[str, CadastroConfig] = {
             "usuario_afetado__nome_exibicao",
             "descricao",
             "request_id",
+            "recurso",
+            "objeto_tipo",
+            "objeto_id",
+            "caminho",
         ),
-        filters=(Filter("tipo", "Tipo de evento", "tipo", "choices"),),
+        filters=(
+            Filter("categoria", "Categoria", "categoria", "choices"),
+            Filter("tipo", "Tipo de evento", "tipo", "choices"),
+            Filter("nivel", "Nível", "nivel", "choices"),
+            Filter("sucesso", "Resultado com sucesso", "sucesso", "boolean"),
+        ),
         default_ordering="-created_at",
         select_related=("ator", "usuario_afetado"),
         allow_create=False,

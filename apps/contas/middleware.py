@@ -44,6 +44,20 @@ class ImpersonationMiddleware:
 
         if sessao.ator_id != actor.pk or not pode_simular_usuario(actor):
             sessao.encerrar(usuario=actor, motivo="Sessão inválida ou permissão removida.")
+            registrar_evento(
+                request,
+                tipo=EventoAuditoria.Tipo.IMPERSONACAO_ENCERRADA,
+                categoria=EventoAuditoria.Categoria.IMPERSONACAO,
+                nivel=EventoAuditoria.Nivel.ATENCAO,
+                ator=actor,
+                usuario_afetado=sessao.usuario_simulado,
+                objeto=sessao,
+                descricao=(
+                    "Simulação encerrada porque a sessão ficou inválida "
+                    "ou a permissão foi removida."
+                ),
+                dados={"motivo_encerramento": sessao.motivo_encerramento},
+            )
             request.session.pop(IMPERSONATION_SESSION_KEY, None)
             request.session.modified = True
             return self.get_response(request)
@@ -51,6 +65,17 @@ class ImpersonationMiddleware:
         target = sessao.usuario_simulado
         if not target.is_active or target.is_superuser:
             sessao.encerrar(usuario=actor, motivo="Usuário simulado indisponível.")
+            registrar_evento(
+                request,
+                tipo=EventoAuditoria.Tipo.IMPERSONACAO_ENCERRADA,
+                categoria=EventoAuditoria.Categoria.IMPERSONACAO,
+                nivel=EventoAuditoria.Nivel.ATENCAO,
+                ator=actor,
+                usuario_afetado=sessao.usuario_simulado,
+                objeto=sessao,
+                descricao="Simulação encerrada porque o usuário simulado ficou indisponível.",
+                dados={"motivo_encerramento": sessao.motivo_encerramento},
+            )
             request.session.pop(IMPERSONATION_SESSION_KEY, None)
             request.session.modified = True
             return self.get_response(request)
@@ -64,9 +89,13 @@ class ImpersonationMiddleware:
             registrar_evento(
                 request,
                 tipo=EventoAuditoria.Tipo.ACAO_BLOQUEADA_IMPERSONACAO,
+                categoria=EventoAuditoria.Categoria.IMPERSONACAO,
+                nivel=EventoAuditoria.Nivel.ATENCAO,
                 ator=actor,
                 usuario_afetado=target,
                 descricao="Ação de escrita bloqueada durante simulação de usuário.",
+                sucesso=False,
+                status_http=403,
                 dados={"metodo": request.method, "caminho": request.path[:500]},
             )
             logger.warning(

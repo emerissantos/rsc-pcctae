@@ -1,23 +1,27 @@
-RSC-PCCTAE 0.7.2 — VALIDAÇÃO
-
-Data: 2026-07-16
+RSC-PCCTAE 0.8.2 — VALIDAÇÃO
 
 Resultado:
 - Django system check: aprovado
 - makemigrations --check --dry-run: nenhuma alteração pendente
-- pytest: 62 testes aprovados
+- pytest: 81 testes aprovados
 - Ruff: aprovado
 - compilação Python: aprovada
-- nenhuma migration nova necessária
 
-Funcionalidades validadas:
-- requerente visualiza a orientação consolidada da comissão;
-- requerente visualiza observações por item não conforme;
-- requerente visualiza responsável e datas da rodada;
-- requerente visualiza prazo para correção;
-- histórico apresenta todas as rodadas concluídas;
-- comissão visualiza rodadas anteriores durante nova triagem;
-- movimentações formais do processo são exibidas em linha do tempo;
-- observações de triagem em andamento não são expostas ao requerente;
-- acesso ao histórico respeita as autorizações já existentes do requerimento;
-- carregamento evita consultas repetitivas por meio de prefetch.
+Cenários validados:
+- membro ativo não visualiza o próprio requerimento na fila;
+- membro ativo recebe 403 ao iniciar triagem do próprio requerimento;
+- operador com permissões explícitas recebe 403 no próprio requerimento;
+- superusuário recebe 403 no próprio requerimento;
+- requerente não abre a tela operacional de triagem já iniciada;
+- requerente não salva nem conclui a própria triagem;
+- situação e conteúdo da triagem permanecem inalterados após tentativas bloqueadas;
+- requerente continua consultando o próprio requerimento pela área pessoal;
+- demais membros e operadores continuam atuando normalmente em processos de terceiros;
+- bloqueios 403 permanecem cobertos pela auditoria transversal.
+
+Pacotes:
+- versão completa extraída e validada novamente
+- atualização incremental aplicada sobre a 0.8.1 e validada novamente
+- 249 arquivos comparados e idênticos entre a versão completa e a atualizada
+- integridade dos dois arquivos ZIP: aprovada
+- hashes SHA-256: confirmados

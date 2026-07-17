@@ -17,8 +17,8 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from apps.auditoria.models import SessaoImpersonacao
-from apps.auditoria.services import get_client_ip
+from apps.auditoria.models import EventoAuditoria, SessaoImpersonacao
+from apps.auditoria.services import get_client_ip, registrar_evento
 from apps.integracoes.common.exceptions import IntegrationError
 from apps.integracoes.ufsb.oauth.client import UFSBOAuthClient
 from apps.integracoes.ufsb.oauth.services import AuthenticateUFSBUserService
@@ -32,6 +32,19 @@ from .services import ProvisionarUsuarioUFSBService
 logger = logging.getLogger(__name__)
 
 OAUTH_SESSION_KEY = "ufsb_oauth_flow"
+
+
+def _registrar_falha_login(request, descricao: str, **dados) -> None:
+    registrar_evento(
+        request,
+        tipo=EventoAuditoria.Tipo.LOGIN_FALHA,
+        categoria=EventoAuditoria.Categoria.AUTENTICACAO,
+        nivel=EventoAuditoria.Nivel.ATENCAO,
+        descricao=descricao,
+        sucesso=False,
+        status_http=401,
+        dados=dados,
+    )
 
 
 @never_cache
@@ -74,8 +87,14 @@ def oauth_start(request):
         }
         request.session.modified = True
         return redirect(client.build_authorization_url(state=state, code_verifier=code_verifier))
-    except IntegrationError:
+    except IntegrationError as exc:
         logger.exception("oauth_start_failed")
+        _registrar_falha_login(
+            request,
+            "Não foi possível iniciar a autenticação institucional.",
+            etapa="inicio",
+            erro=type(exc).__name__,
+        )
         messages.error(request, "A autenticação institucional não está disponível neste momento.")
         return redirect("contas:login")
 
@@ -86,6 +105,12 @@ def oauth_callback(request):
     flow = request.session.pop(OAUTH_SESSION_KEY, None)
     request.session.modified = True
     if not isinstance(flow, dict):
+        _registrar_falha_login(
+            request,
+            "Fluxo OAuth ausente ou expirado.",
+            etapa="callback",
+            motivo="fluxo_ausente",
+        )
         messages.error(
             request,
             "A tentativa de autenticação expirou ou não foi iniciada neste navegador.",
@@ -102,6 +127,13 @@ def oauth_callback(request):
         or age < 0
         or age > settings.UFSB_AUTH["STATE_TTL_SECONDS"]
     ):
+        _registrar_falha_login(
+            request,
+            "Validação de segurança do OAuth recusada.",
+            etapa="callback",
+            motivo="state_invalido_ou_expirado",
+            idade_segundos=age,
+        )
         messages.error(
             request,
             "A validação de segurança da autenticação falhou. "
@@ -112,11 +144,23 @@ def oauth_callback(request):
     provider_error = request.GET.get("error")
     if provider_error:
         logger.warning("oauth_provider_error", extra={"provider_error": provider_error})
+        _registrar_falha_login(
+            request,
+            "Autenticação cancelada ou recusada pelo provedor.",
+            etapa="provedor",
+            erro_provedor=provider_error,
+        )
         messages.warning(request, "A autenticação institucional foi cancelada ou recusada.")
         return redirect("contas:login")
 
     code = request.GET.get("code")
     if not code:
+        _registrar_falha_login(
+            request,
+            "Código de autorização não retornado pelo provedor.",
+            etapa="callback",
+            motivo="codigo_ausente",
+        )
         messages.error(request, "O provedor não retornou o código de autorização esperado.")
         return redirect("contas:login")
 
@@ -127,12 +171,26 @@ def oauth_callback(request):
         )
         result = ProvisionarUsuarioUFSBService().execute(
             userinfo=userinfo,
-            correlation_id=getattr(request, "correlation_id", ""),
+            correlation_id=getattr(request, "request_id", ""),
         )
         django_login(
             request,
             result.usuario,
             backend="django.contrib.auth.backends.ModelBackend",
+        )
+        registrar_evento(
+            request,
+            tipo=EventoAuditoria.Tipo.LOGIN_SUCESSO,
+            categoria=EventoAuditoria.Categoria.AUTENTICACAO,
+            ator=result.usuario,
+            usuario_afetado=result.usuario,
+            objeto=result.usuario,
+            descricao=f"Login institucional realizado por {result.usuario.username}.",
+            status_http=302,
+            dados={
+                "provedor": "sigauth_ufsb",
+                "vinculos_sincronizados": result.vinculos_count,
+            },
         )
         messages.success(request, "Autenticação realizada com sucesso.")
         if result.vinculos_count == 0:
@@ -146,6 +204,13 @@ def oauth_callback(request):
             "oauth_callback_failed",
             extra={"status_code": getattr(exc, "status_code", None)},
         )
+        _registrar_falha_login(
+            request,
+            "Falha ao validar ou provisionar o usuário institucional.",
+            etapa="provisionamento",
+            erro=type(exc).__name__,
+            status_integracao=getattr(exc, "status_code", None),
+        )
         messages.error(request, str(exc))
         return redirect("contas:login")
 
@@ -153,6 +218,19 @@ def oauth_callback(request):
 @never_cache
 @require_POST
 def logout(request):
+    ator = getattr(request, "real_user", request.user)
+    usuario_afetado = request.user if getattr(request, "is_impersonating", False) else ator
+    if getattr(ator, "is_authenticated", False):
+        registrar_evento(
+            request,
+            tipo=EventoAuditoria.Tipo.LOGOUT,
+            categoria=EventoAuditoria.Categoria.AUTENTICACAO,
+            ator=ator,
+            usuario_afetado=usuario_afetado,
+            objeto=ator,
+            descricao=f"Sessão encerrada por {ator.username}.",
+            dados={"impersonacao": bool(getattr(request, "is_impersonating", False))},
+        )
     django_logout(request)
     logout_url = settings.UFSB_AUTH.get("LOGOUT_URL")
     if logout_url:
@@ -199,6 +277,17 @@ def impersonar_iniciar(request, usuario_uuid):
         )
         request.session[IMPERSONATION_SESSION_KEY] = str(sessao.uuid)
         request.session.modified = True
+        registrar_evento(
+            request,
+            tipo=EventoAuditoria.Tipo.IMPERSONACAO_INICIADA,
+            categoria=EventoAuditoria.Categoria.IMPERSONACAO,
+            nivel=EventoAuditoria.Nivel.ATENCAO,
+            ator=ator,
+            usuario_afetado=alvo,
+            objeto=sessao,
+            descricao=f"{ator.username} iniciou simulação como {alvo.username}.",
+            dados={"justificativa": sessao.justificativa},
+        )
         messages.warning(
             request,
             f"Simulação iniciada como {alvo}. O modo é somente leitura.",
@@ -222,6 +311,20 @@ def impersonar_encerrar(request):
     if not getattr(request, "is_impersonating", False) or not sessao:
         raise PermissionDenied
     sessao.encerrar(usuario=ator, motivo="Encerrada manualmente pelo usuário técnico.")
+    registrar_evento(
+        request,
+        tipo=EventoAuditoria.Tipo.IMPERSONACAO_ENCERRADA,
+        categoria=EventoAuditoria.Categoria.IMPERSONACAO,
+        nivel=EventoAuditoria.Nivel.ATENCAO,
+        ator=ator,
+        usuario_afetado=sessao.usuario_simulado,
+        objeto=sessao,
+        descricao=f"{ator.username} encerrou a simulação de {sessao.usuario_simulado.username}.",
+        dados={
+            "justificativa": sessao.justificativa,
+            "motivo_encerramento": sessao.motivo_encerramento,
+        },
+    )
     request.session.pop(IMPERSONATION_SESSION_KEY, None)
     request.session.cycle_key()
     request.session.modified = True

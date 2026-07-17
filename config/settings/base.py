@@ -44,6 +44,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "apps.contas.middleware.ImpersonationMiddleware",
     "apps.core.middleware.CurrentUserMiddleware",
+    "apps.auditoria.middleware.AuditAccessMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

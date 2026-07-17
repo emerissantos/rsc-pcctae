@@ -55,6 +55,7 @@
 
   <div class="correction-actions">
     <a class="button button-primary" href="{% url 'requerimentos:itens' requerimento.uuid %}">Corrigir requerimento</a>
+    <a class="button button-secondary" href="{% url 'requerimentos:gerar-f00' requerimento.uuid %}">Baixar F-00 editável</a>
     <a class="button button-secondary" href="#historico-processo">Ver histórico completo</a>
   </div>
 </section>
@@ -137,6 +138,8 @@
         <div><span>Documentos</span><strong>{{ requerimento.quantidade_documentos }}</strong></div>
         <div><span>Meta do nível</span><strong>{{ requerimento.nivel_pretendido.pontuacao_minima }}</strong></div>
       </div>
+      <a class="button button-secondary button-block" href="{% url 'requerimentos:gerar-f00' requerimento.uuid %}">Baixar F-00 editável (.docx)</a>
+      <p class="fine-print">O documento é preenchido com os dados atuais do requerimento e pode ser complementado no Word ou LibreOffice.</p>
     </div>
   </aside>
 </div>

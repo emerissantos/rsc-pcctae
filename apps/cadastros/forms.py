@@ -49,7 +49,8 @@ class UsuarioAcessoForm(CadastroModelForm):
         help_texts = {
             "groups": (
                 "Os perfis controlam quais cards, cadastros e operações ficam disponíveis. "
-                "O usuário requerente continua vendo somente os próprios requerimentos."
+                "Sem perfil funcional, a conta permanece somente como requerente. O perfil "
+                "Operação de Triagem não libera a Central de Cadastros."
             )
         }
 

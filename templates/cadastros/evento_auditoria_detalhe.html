@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Evento de auditoria | RSC-PCCTAE{% endblock %}
+{% block page_title %}Auditoria — detalhe do evento{% endblock %}
+{% block content %}
+<nav class="breadcrumbs" aria-label="Navegação estrutural">
+  <a href="{% url 'cadastros:central' %}">Cadastros</a><span>›</span>
+  <a href="{% url 'cadastros:area' area.slug %}">{{ area.title }}</a><span>›</span>
+  <a href="{% url 'cadastros:lista' resource.slug %}">{{ resource.title }}</a><span>›</span>
+  <strong>Detalhe</strong>
+</nav>
+<div class="page-heading">
+  <div>
+    <span class="eyebrow orange">{{ evento.get_categoria_display }}</span>
+    <h1>{{ evento.get_tipo_display }}</h1>
+    <p>{{ evento.descricao }}</p>
+  </div>
+  <span class="grid-badge {% if evento.sucesso %}grid-badge-success{% else %}grid-badge-danger{% endif %}">{% if evento.sucesso %}Sucesso{% else %}Falha/bloqueio{% endif %}</span>
+</div>
+<div class="summary-grid audit-summary-grid">
+  <article class="card"><small>Registrado em</small><strong>{{ evento.created_at|date:"d/m/Y H:i:s" }}</strong></article>
+  <article class="card"><small>Ator real</small><strong>{{ evento.ator|default:"Não identificado" }}</strong></article>
+  <article class="card"><small>Usuário afetado</small><strong>{{ evento.usuario_afetado|default:"—" }}</strong></article>
+  <article class="card"><small>Nível</small><strong>{{ evento.get_nivel_display }}</strong></article>
+</div>
+<div class="content-grid two-columns audit-detail-grid">
+  <section class="card">
+    <h2>Contexto da requisição</h2>
+    <dl class="detail-list">
+      <div><dt>Request ID</dt><dd><code>{{ evento.request_id|default:"—" }}</code></dd></div>
+      <div><dt>IP</dt><dd>{{ evento.endereco_ip|default:"—" }}</dd></div>
+      <div><dt>Método e caminho</dt><dd>{{ evento.metodo_http|default:"—" }} {{ evento.caminho|default:"—" }}</dd></div>
+      <div><dt>Status HTTP</dt><dd>{{ evento.status_http|default:"—" }}</dd></div>
+      <div><dt>Navegador</dt><dd>{{ evento.user_agent|default:"—" }}</dd></div>
+    </dl>
+  </section>
+  <section class="card">
+    <h2>Objeto relacionado</h2>
+    <dl class="detail-list">
+      <div><dt>Recurso</dt><dd>{{ evento.recurso|default:"—" }}</dd></div>
+      <div><dt>Tipo</dt><dd><code>{{ evento.objeto_tipo|default:"—" }}</code></dd></div>
+      <div><dt>Identificador</dt><dd><code>{{ evento.objeto_id|default:"—" }}</code></dd></div>
+      <div><dt>Representação</dt><dd>{{ evento.objeto_representacao|default:"—" }}</dd></div>
+      <div><dt>Campos alterados</dt><dd>{% if evento.campos_alterados %}{{ evento.campos_alterados|join:", " }}{% else %}—{% endif %}</dd></div>
+    </dl>
+  </section>
+</div>
+<section class="card audit-json-card">
+  <h2>Comparação da alteração</h2>
+  <div class="content-grid two-columns">
+    <div><h3>Antes</h3><pre>{{ anteriores_json }}</pre></div>
+    <div><h3>Depois</h3><pre>{{ posteriores_json }}</pre></div>
+  </div>
+</section>
+<section class="card audit-json-card"><h2>Dados complementares</h2><pre>{{ dados_json }}</pre></section>
+{% endblock %}

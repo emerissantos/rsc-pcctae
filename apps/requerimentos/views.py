@@ -18,9 +18,12 @@ from django.utils import timezone
 from django.utils.http import content_disposition_header
 from django.views.decorators.http import require_POST
 
+from apps.auditoria.models import EventoAuditoria
+from apps.auditoria.services import registrar_evento, registrar_mudanca, snapshot_model
 from apps.pontuacao.models import ItemPontuacao, Requisito
 from apps.triagem.permissions import pode_visualizar_requerimento
 
+from .documents import gerar_f00_docx
 from .forms import RequerimentoForm, limpar_quantidade
 from .history import montar_contexto_historico
 from .models import DocumentoLancamento, LancamentoItem, Requerimento, UploadTemporario
@@ -82,6 +85,16 @@ def criar(request):
             requerimento.created_by = request.user
             requerimento.updated_by = request.user
             requerimento.save()
+            registrar_mudanca(
+                request,
+                tipo=EventoAuditoria.Tipo.REQUERIMENTO_CRIADO,
+                categoria=EventoAuditoria.Categoria.REQUERIMENTO,
+                descricao=f"Requerimento {requerimento.numero} criado pelo servidor.",
+                objeto=requerimento,
+                anteriores={},
+                posteriores=snapshot_model(requerimento),
+                usuario_afetado=request.user,
+            )
             messages.success(request, "Requerimento criado. Agora informe os itens de pontuação.")
             return redirect("requerimentos:itens", uuid=requerimento.uuid)
     else:
@@ -101,6 +114,20 @@ def detalhe(request, uuid):
     lancamentos = requerimento.lancamentos.select_related("item__requisito").prefetch_related(
         "documentos"
     )
+    registrar_evento(
+        request,
+        tipo=EventoAuditoria.Tipo.REQUERIMENTO_VISUALIZADO,
+        categoria=EventoAuditoria.Categoria.ACESSO,
+        ator=getattr(request, "real_user", request.user),
+        usuario_afetado=requerimento.requerente,
+        objeto=requerimento,
+        descricao=f"Requerimento {requerimento.numero} visualizado.",
+        dados={
+            "situacao": requerimento.situacao,
+            "como_requerente": eh_requerente,
+            "impersonacao": bool(getattr(request, "is_impersonating", False)),
+        },
+    )
     return render(
         request,
         "requerimentos/detalhe.html",
@@ -110,6 +137,39 @@ def detalhe(request, uuid):
             **contexto_historico,
         },
     )
+
+
+@login_required
+def gerar_formulario_f00(request, uuid):
+    requerimento = _requerimento_do_usuario(request, uuid)
+    conteudo = gerar_f00_docx(requerimento)
+    nome_arquivo = f"F-00-RSC-PCCTAE-{requerimento.numero}.docx"
+    registrar_evento(
+        request,
+        tipo=EventoAuditoria.Tipo.FORMULARIO_F00_GERADO,
+        categoria=EventoAuditoria.Categoria.DOCUMENTO,
+        ator=getattr(request, "real_user", request.user),
+        usuario_afetado=requerimento.requerente,
+        objeto=requerimento,
+        descricao=f"Formulário F-00 do requerimento {requerimento.numero} gerado em DOCX.",
+        dados={
+            "nome_arquivo": nome_arquivo,
+            "situacao": requerimento.situacao,
+            "quantidade_itens": requerimento.quantidade_itens,
+            "quantidade_documentos": requerimento.quantidade_documentos,
+            "impersonacao": bool(getattr(request, "is_impersonating", False)),
+        },
+    )
+    response = HttpResponse(
+        conteudo,
+        content_type=(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ),
+    )
+    response["Content-Disposition"] = content_disposition_header(True, nome_arquivo)
+    response["Cache-Control"] = "private, no-store, no-cache, max-age=0"
+    response["Pragma"] = "no-cache"
+    return response
 
 
 @login_required
@@ -152,6 +212,22 @@ def upload_comprovante(request, uuid, item_uuid):
             created_by=request.user,
             updated_by=request.user,
         )
+        registrar_evento(
+            request,
+            tipo=EventoAuditoria.Tipo.UPLOAD_TEMPORARIO_CRIADO,
+            categoria=EventoAuditoria.Categoria.DOCUMENTO,
+            usuario_afetado=request.user,
+            objeto=temporario,
+            descricao=f"Upload temporário enviado para o item {item.codigo}.",
+            dados_posteriores=snapshot_model(temporario),
+            dados={
+                "requerimento": requerimento.numero,
+                "item": item.codigo,
+                "nome_original": temporario.nome_original,
+                "tamanho_bytes": temporario.tamanho_bytes,
+                "tipo_mime": temporario.tipo_mime,
+            },
+        )
     except ValidationError as exc:
         return JsonResponse({"ok": False, "erro": exc.messages[0]}, status=400)
     return JsonResponse(
@@ -181,8 +257,20 @@ def remover_upload_temporario(request, uuid, upload_uuid):
         requerimento=requerimento,
         status=UploadTemporario.Status.CONCLUIDO,
     )
+    anteriores = snapshot_model(upload)
+    nome_original = upload.nome_original
     upload.remover_arquivo()
     upload.delete()
+    registrar_evento(
+        request,
+        tipo=EventoAuditoria.Tipo.UPLOAD_TEMPORARIO_REMOVIDO,
+        categoria=EventoAuditoria.Categoria.DOCUMENTO,
+        usuario_afetado=request.user,
+        objeto=upload,
+        descricao=f"Upload temporário {nome_original} removido pelo requerente.",
+        dados_anteriores=anteriores,
+        dados={"requerimento": requerimento.numero},
+    )
     return JsonResponse({"ok": True})
 
 
@@ -205,6 +293,7 @@ def _vincular_upload(*, upload, lancamento, usuario):
     upload.updated_by = usuario
     upload.save(update_fields=["status", "updated_by", "updated_at"])
     transaction.on_commit(lambda: storage.delete(nome_temporario))
+    return documento
 
 
 @login_required
@@ -218,6 +307,7 @@ def salvar_item(request, uuid, item_uuid):
         .prefetch_related("documentos")
         .first()
     )
+    anteriores = snapshot_model(lancamento_existente) if lancamento_existente else {}
     upload_ids = list(dict.fromkeys(request.POST.getlist("upload_ids")))
 
     try:
@@ -260,9 +350,37 @@ def salvar_item(request, uuid, item_uuid):
         lancamento.updated_by = request.user
         lancamento.save()
 
+    documentos_adicionados = []
     for upload in uploads:
-        _vincular_upload(upload=upload, lancamento=lancamento, usuario=request.user)
+        documento = _vincular_upload(upload=upload, lancamento=lancamento, usuario=request.user)
+        documentos_adicionados.append(documento)
+        registrar_evento(
+            request,
+            tipo=EventoAuditoria.Tipo.DOCUMENTO_ADICIONADO,
+            categoria=EventoAuditoria.Categoria.DOCUMENTO,
+            usuario_afetado=request.user,
+            objeto=documento,
+            descricao=f"Comprovante {documento.nome_original} vinculado ao item {item.codigo}.",
+            dados_posteriores=snapshot_model(documento),
+            dados={"requerimento": requerimento.numero, "item": item.codigo},
+        )
 
+    registrar_mudanca(
+        request,
+        tipo=EventoAuditoria.Tipo.ITEM_REQUERIMENTO_SALVO,
+        categoria=EventoAuditoria.Categoria.REQUERIMENTO,
+        descricao=f"Item {item.codigo} salvo no requerimento {requerimento.numero}.",
+        objeto=lancamento,
+        anteriores=anteriores,
+        posteriores=snapshot_model(lancamento),
+        usuario_afetado=request.user,
+        dados={
+            "requerimento": requerimento.numero,
+            "item": item.codigo,
+            "criado": created,
+            "documentos_adicionados": [doc.nome_original for doc in documentos_adicionados],
+        },
+    )
     requerimento.refresh_from_db(fields=["pontuacao_declarada"])
     return JsonResponse(
         {
@@ -284,7 +402,18 @@ def remover_item(request, uuid, item_uuid):
         item__uuid=item_uuid,
     )
     codigo = lancamento.item_codigo_snapshot
+    anteriores = snapshot_model(lancamento)
     lancamento.delete()
+    registrar_evento(
+        request,
+        tipo=EventoAuditoria.Tipo.ITEM_REQUERIMENTO_REMOVIDO,
+        categoria=EventoAuditoria.Categoria.REQUERIMENTO,
+        usuario_afetado=request.user,
+        objeto=lancamento,
+        descricao=f"Item {codigo} removido do requerimento {requerimento.numero}.",
+        dados_anteriores=anteriores,
+        dados={"requerimento": requerimento.numero, "item": codigo},
+    )
     messages.success(request, f"Item {codigo} removido.")
     return redirect("requerimentos:itens", uuid=requerimento.uuid)
 
@@ -333,6 +462,20 @@ def baixar_documento(request, uuid, documento_uuid):
             "usuario_id": request.user.pk,
         },
     )
+    registrar_evento(
+        request,
+        tipo=EventoAuditoria.Tipo.DOCUMENTO_BAIXADO,
+        categoria=EventoAuditoria.Categoria.DOCUMENTO,
+        ator=getattr(request, "real_user", request.user),
+        usuario_afetado=requerimento.requerente,
+        objeto=documento,
+        descricao=f"Comprovante {documento.nome_original} acessado.",
+        dados={
+            "requerimento": requerimento.numero,
+            "item": documento.lancamento.item_codigo_snapshot,
+            "impersonacao": bool(getattr(request, "is_impersonating", False)),
+        },
+    )
     return resposta
 
 
@@ -345,7 +488,20 @@ def remover_documento(request, uuid, documento_uuid):
         uuid=documento_uuid,
         lancamento__requerimento=requerimento,
     )
+    anteriores = snapshot_model(documento)
+    nome_original = documento.nome_original
+    codigo_item = documento.lancamento.item_codigo_snapshot
     documento.delete()
+    registrar_evento(
+        request,
+        tipo=EventoAuditoria.Tipo.DOCUMENTO_REMOVIDO,
+        categoria=EventoAuditoria.Categoria.DOCUMENTO,
+        usuario_afetado=request.user,
+        objeto=documento,
+        descricao=f"Comprovante {nome_original} removido do item {codigo_item}.",
+        dados_anteriores=anteriores,
+        dados={"requerimento": requerimento.numero, "item": codigo_item},
+    )
     messages.success(request, "Documento removido.")
     return redirect("requerimentos:itens", uuid=requerimento.uuid)
 
@@ -368,11 +524,29 @@ def revisao(request, uuid):
 @require_POST
 def submeter(request, uuid):
     requerimento = _requerimento_do_usuario(request, uuid, editavel=True)
+    anteriores = snapshot_model(requerimento)
+    situacao_anterior = requerimento.situacao
     try:
         requerimento.submeter(request.user)
     except ValidationError as exc:
         for mensagem in exc.messages:
             messages.error(request, mensagem)
         return redirect("requerimentos:revisao", uuid=requerimento.uuid)
+    requerimento.refresh_from_db()
+    registrar_mudanca(
+        request,
+        tipo=EventoAuditoria.Tipo.REQUERIMENTO_SUBMETIDO,
+        categoria=EventoAuditoria.Categoria.REQUERIMENTO,
+        descricao=f"Requerimento {requerimento.numero} submetido pelo servidor.",
+        objeto=requerimento,
+        anteriores=anteriores,
+        posteriores=snapshot_model(requerimento),
+        usuario_afetado=request.user,
+        dados={
+            "situacao_anterior": situacao_anterior,
+            "situacao_nova": requerimento.situacao,
+            "correcao": situacao_anterior == Requerimento.Situacao.PENDENTE_CORRECAO,
+        },
+    )
     messages.success(request, "Requerimento submetido com sucesso.")
     return redirect("requerimentos:detalhe", uuid=requerimento.uuid)

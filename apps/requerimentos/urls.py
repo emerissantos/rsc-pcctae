@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.lista, name="lista"),
     path("novo/", views.criar, name="criar"),
     path("<uuid:uuid>/", views.detalhe, name="detalhe"),
+    path("<uuid:uuid>/formularios/f00.docx", views.gerar_formulario_f00, name="gerar-f00"),
     path("<uuid:uuid>/itens/", views.itens, name="itens"),
     path(
         "<uuid:uuid>/itens/<uuid:item_uuid>/upload/",

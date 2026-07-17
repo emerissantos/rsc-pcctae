@@ -13,7 +13,13 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
 from apps.auditoria.models import EventoAuditoria
-from apps.auditoria.services import registrar_evento
+from apps.auditoria.services import (
+    pretty_json,
+    registrar_evento,
+    registrar_mudanca,
+    snapshot_model,
+)
+from apps.contas.models import Usuario
 from apps.contas.permissions import (
     pode_importar_usuario_sig,
     usuario_pode_ser_simulado,
@@ -155,10 +161,14 @@ def _build_rows(request, resource: CadastroConfig, objects):
                 "contas:impersonar-iniciar",
                 kwargs={"usuario_uuid": obj.uuid},
             )
+        view_url = ""
+        if resource.slug == "eventos-auditoria":
+            view_url = reverse("cadastros:evento-auditoria-detalhe", kwargs={"uuid": obj.uuid})
         rows.append(
             {
                 "object": obj,
                 "cells": cells,
+                "view_url": view_url,
                 "edit_url": reverse(
                     "cadastros:editar",
                     kwargs={"resource_slug": resource.slug, "object_id": identifier},
@@ -324,7 +334,19 @@ def criar(request, resource_slug):
         raise PermissionDenied
     form = resource.form_class(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        _save_form(request, resource, form, creating=True)
+        obj = _save_form(request, resource, form, creating=True)
+        posteriores = snapshot_model(obj)
+        registrar_mudanca(
+            request,
+            tipo=EventoAuditoria.Tipo.CADASTRO_CRIADO,
+            categoria=EventoAuditoria.Categoria.CADASTRO,
+            descricao=f"Registro criado em {resource.title}: {obj}.",
+            objeto=obj,
+            anteriores={},
+            posteriores=posteriores,
+            usuario_afetado=obj if isinstance(obj, Usuario) else None,
+            dados={"cadastro": resource.slug},
+        )
         messages.success(request, f"{resource.title}: registro criado com sucesso.")
         return redirect("cadastros:lista", resource_slug=resource.slug)
     return render(
@@ -349,9 +371,22 @@ def editar(request, resource_slug, object_id):
     if not resource.allow_update or not resource.form_class:
         raise PermissionDenied
     obj = _get_object(resource, object_id)
+    anteriores = snapshot_model(obj) if request.method == "POST" else {}
     form = resource.form_class(request.POST or None, instance=obj)
     if request.method == "POST" and form.is_valid():
-        _save_form(request, resource, form, creating=False)
+        obj = _save_form(request, resource, form, creating=False)
+        posteriores = snapshot_model(obj)
+        registrar_mudanca(
+            request,
+            tipo=EventoAuditoria.Tipo.CADASTRO_ALTERADO,
+            categoria=EventoAuditoria.Categoria.CADASTRO,
+            descricao=f"Registro alterado em {resource.title}: {obj}.",
+            objeto=obj,
+            anteriores=anteriores,
+            posteriores=posteriores,
+            usuario_afetado=obj if isinstance(obj, Usuario) else None,
+            dados={"cadastro": resource.slug},
+        )
         messages.success(request, f"{resource.title}: alterações salvas com sucesso.")
         return redirect("cadastros:lista", resource_slug=resource.slug)
     return render(
@@ -378,6 +413,8 @@ def excluir(request, resource_slug, object_id):
         raise PermissionDenied
     obj = _get_object(resource, object_id)
     if request.method == "POST":
+        anteriores = snapshot_model(obj)
+        usuario_afetado = obj if isinstance(obj, Usuario) else None
         try:
             obj.delete()
         except ProtectedError:
@@ -387,6 +424,17 @@ def excluir(request, resource_slug, object_id):
                 "Inative-o para preservar o histórico.",
             )
         else:
+            registrar_mudanca(
+                request,
+                tipo=EventoAuditoria.Tipo.CADASTRO_EXCLUIDO,
+                categoria=EventoAuditoria.Categoria.CADASTRO,
+                descricao=f"Registro excluído de {resource.title}: {obj}.",
+                objeto=obj,
+                anteriores=anteriores,
+                posteriores={},
+                usuario_afetado=usuario_afetado,
+                dados={"cadastro": resource.slug},
+            )
             messages.success(request, "Registro excluído com sucesso.")
         return redirect("cadastros:lista", resource_slug=resource.slug)
     return render(
@@ -415,9 +463,12 @@ def importar_usuario_sig(request):
             registrar_evento(
                 request,
                 tipo=EventoAuditoria.Tipo.IMPORTACAO_USUARIO_SIG,
+                categoria=EventoAuditoria.Categoria.INTEGRACAO,
                 ator=ator,
                 usuario_afetado=result.usuario,
+                objeto=result.usuario,
                 descricao=f"Usuário {result.usuario.username} importado ou atualizado pelo SIG.",
+                dados_posteriores=snapshot_model(result.usuario),
                 dados={
                     "tipo_identificador": form.cleaned_data["tipo_identificador"],
                     "vinculos_sincronizados": result.vinculos_count,
@@ -438,5 +489,27 @@ def importar_usuario_sig(request):
             "form": form,
             "resource": _resource_or_404("usuarios"),
             "area": AREAS["pessoas-acessos"],
+        },
+    )
+
+
+@login_required
+def evento_auditoria_detalhe(request, uuid):
+    resource = _resource_or_404("eventos-auditoria")
+    _require_permission(request, resource, "view")
+    evento = get_object_or_404(
+        EventoAuditoria.objects.select_related("ator", "usuario_afetado"),
+        uuid=uuid,
+    )
+    return render(
+        request,
+        "cadastros/evento_auditoria_detalhe.html",
+        {
+            "evento": evento,
+            "resource": resource,
+            "area": AREAS[resource.area],
+            "anteriores_json": pretty_json(evento.dados_anteriores),
+            "posteriores_json": pretty_json(evento.dados_posteriores),
+            "dados_json": pretty_json(evento.dados),
         },
     )

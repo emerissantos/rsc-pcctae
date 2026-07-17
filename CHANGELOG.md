@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.8.2 — impedimento de atuação no próprio requerimento
+
+- cria regra transversal de segregação de funções para etapas operacionais;
+- impede que o requerente visualize, inicie, altere ou conclua a triagem do próprio processo;
+- a vedação prevalece sobre comissão ativa, permissões operacionais, `is_staff` e `is_superuser`;
+- remove o próprio requerimento da fila de triagem do usuário;
+- preserva o acesso do requerente à consulta, correção, histórico e comprovantes do próprio processo;
+- disponibiliza função reutilizável para o futuro módulo de avaliação, relatoria e deliberação;
+- adiciona testes de fila, URL direta, membro ativo, operador e superusuário.
+
+## 0.8.1 — formulário F-00 em DOCX editável
+
+- gera o F-00 diretamente no requerimento em formato DOCX;
+- preenche dados funcionais, nível, pontuação, itens e comprovantes;
+- organiza os itens pelos critérios I a VI com subtotais e total;
+- destaca campos ausentes para complementação manual;
+- registra a geração na auditoria e protege o download contra cache;
+- adiciona python-docx, migration e testes de autorização e conteúdo.
+
+## 0.8.0 — auditoria transversal
+
+- amplia o evento de auditoria com categoria, nível, sucesso, recurso, objeto, método, caminho e status HTTP;
+- registra login bem-sucedido, falhas do OAuth e logout;
+- registra respostas 403 com ator real, usuário simulado, IP e request ID;
+- registra criação, alteração e exclusão nos cadastros estruturais;
+- preserva comparação automática dos valores anteriores e posteriores e a lista de campos alterados;
+- registra atribuição e remoção de perfis, ativação e desativação de usuários;
+- registra criação, visualização e submissão de requerimentos;
+- registra itens adicionados, alterados ou removidos;
+- registra uploads temporários, comprovantes vinculados, downloads e remoções;
+- registra início, salvamento e conclusão de cada rodada de triagem;
+- registra início, encerramento automático ou manual e tentativas bloqueadas durante simulação;
+- cria tela detalhada do evento com comparação antes/depois e dados complementares;
+- protege senhas, tokens e chaves e mascara CPF/CNPJ nos snapshots;
+- torna os eventos somente leitura na interface e no Django Admin;
+- ajusta o grupo Administradores para não receber permissões de alteração/exclusão em recursos somente leitura;
+- adiciona migration e testes transversais de autenticação, autorização, CRUD, documentos e triagem.
+
+## 0.7.3 — isolamento da Central de Cadastros
+
+- remove definitivamente o bypass de acesso concedido por `is_staff`;
+- exige vínculo a um perfil funcional próprio da Central de Cadastros;
+- impede que permissões diretas residuais liberem cards ou URLs administrativas;
+- impede que o perfil Operação de Triagem exponha cadastros por compartilhar permissões de consulta;
+- mantém superusuário como único acesso emergencial implícito;
+- cria o comando `configurar_como_requerente` para limpar perfis, permissões diretas e flags administrativas;
+- adiciona testes para requerente, antigo staff, permissão residual e operador de triagem.
+
 ## 0.7.2 — histórico de triagem e comunicações
 
 - adiciona resumo destacado das correções solicitadas no requerimento;

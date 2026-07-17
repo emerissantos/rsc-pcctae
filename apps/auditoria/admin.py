@@ -5,9 +5,25 @@ from .models import EventoAuditoria, SessaoImpersonacao
 
 @admin.register(EventoAuditoria)
 class EventoAuditoriaAdmin(admin.ModelAdmin):
-    list_display = ("tipo", "ator", "usuario_afetado", "created_at")
-    list_filter = ("tipo", "created_at")
-    search_fields = ("ator__username", "usuario_afetado__username", "descricao", "request_id")
+    list_display = (
+        "categoria",
+        "tipo",
+        "nivel",
+        "ator",
+        "usuario_afetado",
+        "sucesso",
+        "created_at",
+    )
+    list_filter = ("categoria", "tipo", "nivel", "sucesso", "created_at")
+    search_fields = (
+        "ator__username",
+        "usuario_afetado__username",
+        "descricao",
+        "request_id",
+        "objeto_tipo",
+        "objeto_id",
+        "caminho",
+    )
     readonly_fields = tuple(field.name for field in EventoAuditoria._meta.fields)
 
     def has_add_permission(self, request):

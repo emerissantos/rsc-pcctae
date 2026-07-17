@@ -4,11 +4,27 @@ from django.contrib.auth.models import Group, Permission
 
 from .registry import RESOURCES, CadastroArea, CadastroConfig
 
+CADASTRO_ACCESS_GROUP_NAMES = frozenset(
+    {
+        "Administradores do RSC-PCCTAE",
+        "Gestão de Pessoas e Acessos",
+        "Gestão de Comissões",
+        "Gestão de Pontuação",
+        "Gestão de Triagem",
+        "Consulta de Cadastros",
+    }
+)
+
+
 GROUP_DEFINITIONS: dict[str, tuple[str, ...]] = {
     "Administradores do RSC-PCCTAE": tuple(
         resource.permission(action)
         for resource in RESOURCES.values()
         for action in ("view", "add", "change", "delete")
+        if action == "view"
+        or (action == "add" and resource.allow_create)
+        or (action == "change" and resource.allow_update)
+        or (action == "delete" and resource.allow_delete)
     )
     + (
         "contas.importar_usuario_sig",
@@ -79,10 +95,25 @@ GROUP_DEFINITIONS: dict[str, tuple[str, ...]] = {
 }
 
 
-def pode_acao(user, resource: CadastroConfig, action: str) -> bool:
+def possui_perfil_de_cadastros(user) -> bool:
+    """Indica se o usuário recebeu um perfil funcional da Central de Cadastros.
+
+    Permissões técnicas isoladas e ``is_staff`` não liberam a central. Isso evita que
+    permissões necessárias em módulos operacionais — como a triagem — façam surgir
+    cards administrativos para o requerente.
+    """
+
     if not getattr(user, "is_authenticated", False):
         return False
-    if user.is_superuser or user.is_staff:
+    if user.is_superuser:
+        return True
+    return user.groups.filter(name__in=CADASTRO_ACCESS_GROUP_NAMES).exists()
+
+
+def pode_acao(user, resource: CadastroConfig, action: str) -> bool:
+    if not possui_perfil_de_cadastros(user):
+        return False
+    if user.is_superuser:
         return True
     if action == "add" and not resource.allow_create:
         return False

@@ -16,11 +16,14 @@ from apps.requerimentos.models import Requerimento
 
 @pytest.fixture
 def staff_user(db):
-    return Usuario.objects.create_user(
+    seed_groups()
+    usuario = Usuario.objects.create_user(
         username="gestor",
         password="teste",
         is_staff=True,
     )
+    usuario.groups.add(Group.objects.get(name="Administradores do RSC-PCCTAE"))
+    return usuario
 
 
 @pytest.mark.django_db
@@ -34,7 +37,7 @@ def test_usuario_sem_permissao_nao_acessa_central(client):
 
 
 @pytest.mark.django_db
-def test_staff_visualiza_areas_em_cards(client, staff_user):
+def test_administrador_com_perfil_visualiza_areas_em_cards(client, staff_user):
     client.force_login(staff_user)
 
     resposta = client.get(reverse("cadastros:central"))
@@ -190,7 +193,7 @@ def test_requerente_visualiza_somente_os_proprios_requerimentos(client):
 
 
 @pytest.mark.django_db
-def test_permissoes_de_modelo_bastam_sem_is_staff(client):
+def test_permissao_direta_residual_nao_libera_central(client):
     usuario = Usuario.objects.create_user(username="pontuacao", password="teste")
     permission = Permission.objects.get(
         content_type__app_label="pontuacao",
@@ -199,8 +202,32 @@ def test_permissoes_de_modelo_bastam_sem_is_staff(client):
     usuario.user_permissions.add(permission)
     client.force_login(usuario)
 
-    assert client.get(reverse("cadastros:central")).status_code == 200
-    assert client.get(reverse("cadastros:lista", args=["niveis-rsc"])).status_code == 200
+    assert client.get(reverse("cadastros:central")).status_code == 403
+    assert client.get(reverse("cadastros:lista", args=["niveis-rsc"])).status_code == 403
+
+
+@pytest.mark.django_db
+def test_staff_sem_perfil_funcional_nao_acessa_cadastros(client):
+    usuario = Usuario.objects.create_user(
+        username="staff-tecnico",
+        password="teste",
+        is_staff=True,
+    )
+    client.force_login(usuario)
+
+    assert client.get(reverse("cadastros:central")).status_code == 403
+    assert client.get(reverse("cadastros:lista", args=["usuarios"])).status_code == 403
+
+
+@pytest.mark.django_db
+def test_operacao_de_triagem_nao_exibe_central_de_cadastros(client):
+    seed_groups()
+    usuario = Usuario.objects.create_user(username="operador", password="teste")
+    usuario.groups.add(Group.objects.get(name="Operação de Triagem"))
+    client.force_login(usuario)
+
+    assert usuario.has_perm("comissoes.view_comissao")
+    assert client.get(reverse("cadastros:central")).status_code == 403
     assert client.get(reverse("cadastros:lista", args=["comissoes"])).status_code == 403
 
 

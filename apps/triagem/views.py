@@ -9,6 +9,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from apps.auditoria.models import EventoAuditoria
+from apps.auditoria.services import registrar_evento, registrar_mudanca, snapshot_model
 from apps.comissoes.models import Comissao
 from apps.requerimentos.history import montar_contexto_historico
 from apps.requerimentos.models import HistoricoRequerimento, Requerimento
@@ -48,6 +50,16 @@ def _obter_requerimento(uuid) -> Requerimento:
         ),
         uuid=uuid,
     )
+
+
+def _snapshot_triagem(triagem: TriagemRequerimento) -> dict:
+    return {
+        "triagem": snapshot_model(triagem),
+        "verificacoes": [
+            snapshot_model(verificacao)
+            for verificacao in triagem.verificacoes.select_related("item").order_by("pk")
+        ],
+    }
 
 
 def _processar_formularios_triagem(request, triagem: TriagemRequerimento) -> bool:
@@ -90,8 +102,10 @@ def fila(request):
         Requerimento.Situacao.PENDENTE_CORRECAO,
         Requerimento.Situacao.EM_ANALISE,
     ]
-    queryset = Requerimento.objects.filter(situacao__in=situacoes).select_related(
-        "requerente", "vinculo", "nivel_pretendido", "comissao"
+    queryset = (
+        Requerimento.objects.filter(situacao__in=situacoes)
+        .exclude(requerente=request.user)
+        .select_related("requerente", "vinculo", "nivel_pretendido", "comissao")
     )
     if not pode_acessar_fila(request.user):
         raise PermissionDenied
@@ -105,6 +119,7 @@ def fila(request):
 @transaction.atomic
 def iniciar(request, uuid):
     requerimento = _obter_requerimento(uuid)
+    requerimento_antes = snapshot_model(requerimento)
     if requerimento.situacao != Requerimento.Situacao.SUBMETIDO:
         messages.error(request, "Somente requerimentos submetidos podem iniciar uma triagem.")
         return redirect("triagem:fila")
@@ -169,6 +184,20 @@ def iniciar(request, uuid):
         created_by=request.user,
         updated_by=request.user,
     )
+    registrar_mudanca(
+        request,
+        tipo=EventoAuditoria.Tipo.TRIAGEM_INICIADA,
+        categoria=EventoAuditoria.Categoria.TRIAGEM,
+        descricao=f"Triagem do requerimento {requerimento.numero} iniciada — rodada {rodada}.",
+        objeto=triagem,
+        anteriores={"requerimento": requerimento_antes},
+        posteriores={
+            "requerimento": snapshot_model(requerimento),
+            "triagem": _snapshot_triagem(triagem),
+        },
+        usuario_afetado=requerimento.requerente,
+        dados={"rodada": rodada, "comissao": str(requerimento.comissao)},
+    )
     messages.success(request, "Triagem iniciada.")
     return redirect("triagem:detalhe", uuid=triagem.uuid)
 
@@ -200,6 +229,20 @@ def detalhe(request, uuid):
         triagem.requerimento,
         incluir_triagens_em_andamento=True,
     )
+    registrar_evento(
+        request,
+        tipo=EventoAuditoria.Tipo.REQUERIMENTO_VISUALIZADO,
+        categoria=EventoAuditoria.Categoria.ACESSO,
+        ator=getattr(request, "real_user", request.user),
+        usuario_afetado=triagem.requerimento.requerente,
+        objeto=triagem.requerimento,
+        descricao=f"Requerimento {triagem.requerimento.numero} visualizado pela área de triagem.",
+        dados={
+            "origem": "triagem",
+            "rodada": triagem.rodada,
+            "situacao": triagem.requerimento.situacao,
+        },
+    )
     return render(
         request,
         "triagem/detalhe.html",
@@ -227,7 +270,20 @@ def salvar(request, uuid):
         messages.error(request, "Esta triagem já foi concluída.")
         return redirect("triagem:detalhe", uuid=triagem.uuid)
 
+    anteriores = _snapshot_triagem(triagem)
     if _processar_formularios_triagem(request, triagem):
+        triagem.refresh_from_db()
+        registrar_mudanca(
+            request,
+            tipo=EventoAuditoria.Tipo.TRIAGEM_SALVA,
+            categoria=EventoAuditoria.Categoria.TRIAGEM,
+            descricao=f"Triagem do requerimento {triagem.requerimento.numero} salva.",
+            objeto=triagem,
+            anteriores=anteriores,
+            posteriores=_snapshot_triagem(triagem),
+            usuario_afetado=triagem.requerimento.requerente,
+            dados={"rodada": triagem.rodada},
+        )
         messages.success(request, "Triagem salva.")
     return redirect("triagem:detalhe", uuid=triagem.uuid)
 
@@ -246,6 +302,10 @@ def concluir(request, uuid):
         messages.error(request, "Esta triagem já foi concluída.")
         return redirect("triagem:detalhe", uuid=triagem.uuid)
 
+    anteriores = {
+        "triagem": _snapshot_triagem(triagem),
+        "requerimento": snapshot_model(triagem.requerimento),
+    }
     # Persiste os campos apresentados na mesma tela antes de validar a conclusão.
     if not _processar_formularios_triagem(request, triagem):
         return redirect("triagem:detalhe", uuid=triagem.uuid)
@@ -294,6 +354,28 @@ def concluir(request, uuid):
         descricao=descricao,
         created_by=request.user,
         updated_by=request.user,
+    )
+    triagem.refresh_from_db()
+    requerimento.refresh_from_db()
+    registrar_mudanca(
+        request,
+        tipo=EventoAuditoria.Tipo.TRIAGEM_CONCLUIDA,
+        categoria=EventoAuditoria.Categoria.TRIAGEM,
+        descricao=descricao,
+        objeto=triagem,
+        anteriores=anteriores,
+        posteriores={
+            "triagem": _snapshot_triagem(triagem),
+            "requerimento": snapshot_model(requerimento),
+        },
+        usuario_afetado=requerimento.requerente,
+        dados={
+            "rodada": triagem.rodada,
+            "resultado": triagem.resultado,
+            "situacao_anterior": situacao_anterior,
+            "situacao_nova": requerimento.situacao,
+            "prazo_correcao_ate": triagem.prazo_correcao_ate,
+        },
     )
     messages.success(request, descricao)
     return redirect("triagem:fila")

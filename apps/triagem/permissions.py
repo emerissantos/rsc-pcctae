@@ -4,6 +4,7 @@ from django.db.models import Q, QuerySet
 from django.utils import timezone
 
 from apps.comissoes.models import Comissao
+from apps.requerimentos.permissions import pode_atuar_operacionalmente
 
 PERMISSAO_ACESSAR_FILA = "triagem.acessar_fila_triagem"
 PERMISSAO_INICIAR = "triagem.iniciar_triagem"
@@ -56,7 +57,10 @@ def pode_acessar_fila(usuario) -> bool:
 
 
 def pode_visualizar_requerimento(usuario, requerimento) -> bool:
-    if not getattr(usuario, "is_authenticated", False) or not requerimento.comissao_id:
+    if (
+        not pode_atuar_operacionalmente(usuario, requerimento)
+        or not requerimento.comissao_id
+    ):
         return False
     if usuario.is_superuser or usuario.has_perm(PERMISSAO_ACESSAR_FILA):
         return True
@@ -64,6 +68,8 @@ def pode_visualizar_requerimento(usuario, requerimento) -> bool:
 
 
 def pode_iniciar_triagem(usuario, requerimento) -> bool:
+    if not pode_atuar_operacionalmente(usuario, requerimento):
+        return False
     if requerimento.comissao_id and possui_participacao_ativa(
         usuario, comissao_id=requerimento.comissao_id
     ):
@@ -72,6 +78,8 @@ def pode_iniciar_triagem(usuario, requerimento) -> bool:
 
 
 def pode_alterar_triagem(usuario, requerimento) -> bool:
+    if not pode_atuar_operacionalmente(usuario, requerimento):
+        return False
     if requerimento.comissao_id and possui_participacao_ativa(
         usuario, comissao_id=requerimento.comissao_id
     ):
@@ -80,6 +88,8 @@ def pode_alterar_triagem(usuario, requerimento) -> bool:
 
 
 def pode_concluir_triagem(usuario, requerimento) -> bool:
+    if not pode_atuar_operacionalmente(usuario, requerimento):
+        return False
     if requerimento.comissao_id and possui_participacao_ativa(
         usuario, comissao_id=requerimento.comissao_id
     ):

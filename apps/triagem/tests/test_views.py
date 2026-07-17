@@ -492,3 +492,127 @@ def test_comissao_visualiza_rodadas_anteriores_na_nova_triagem(client, contexto_
     assert "Rodada 2" in conteudo
     assert "Rodada 1" in conteudo
     assert "Orientação preservada da primeira rodada." in conteudo
+
+
+@pytest.mark.django_db
+def test_requerente_membro_ativo_nao_ve_proprio_requerimento_na_fila(
+    client, contexto_triagem
+):
+    hoje = timezone.localdate()
+    requerente = contexto_triagem["requerente"]
+    requerimento = contexto_triagem["requerimento"]
+    MembroComissao.objects.create(
+        comissao=contexto_triagem["comissao"],
+        usuario=requerente,
+        nome_snapshot=str(requerente),
+        papel=MembroComissao.Papel.MEMBRO,
+        inicio_mandato=hoje - timedelta(days=1),
+        ativo=True,
+    )
+    client.force_login(requerente)
+
+    resposta = client.get(reverse("triagem:fila"))
+
+    assert resposta.status_code == 200
+    assert requerimento.numero not in resposta.content.decode()
+
+
+@pytest.mark.django_db
+def test_requerente_membro_ativo_nao_inicia_triagem_do_proprio_requerimento(
+    client, contexto_triagem
+):
+    hoje = timezone.localdate()
+    requerente = contexto_triagem["requerente"]
+    requerimento = contexto_triagem["requerimento"]
+    MembroComissao.objects.create(
+        comissao=contexto_triagem["comissao"],
+        usuario=requerente,
+        nome_snapshot=str(requerente),
+        papel=MembroComissao.Papel.MEMBRO,
+        inicio_mandato=hoje - timedelta(days=1),
+        ativo=True,
+    )
+    client.force_login(requerente)
+
+    resposta = client.post(reverse("triagem:iniciar", args=[requerimento.uuid]))
+
+    assert resposta.status_code == 403
+    assert not TriagemRequerimento.objects.filter(requerimento=requerimento).exists()
+    requerimento.refresh_from_db()
+    assert requerimento.situacao == Requerimento.Situacao.SUBMETIDO
+
+
+@pytest.mark.django_db
+def test_requerente_com_permissoes_operacionais_nao_tria_proprio_requerimento(
+    client, contexto_triagem
+):
+    from django.contrib.auth.models import Group
+
+    from apps.cadastros.permissions import seed_groups
+
+    seed_groups()
+    requerente = contexto_triagem["requerente"]
+    requerimento = contexto_triagem["requerimento"]
+    requerente.groups.add(Group.objects.get(name="Operação de Triagem"))
+    client.force_login(requerente)
+
+    assert client.get(reverse("triagem:fila")).status_code == 200
+    resposta = client.post(reverse("triagem:iniciar", args=[requerimento.uuid]))
+
+    assert resposta.status_code == 403
+    assert not TriagemRequerimento.objects.filter(requerimento=requerimento).exists()
+
+
+@pytest.mark.django_db
+def test_requerente_superusuario_nao_tria_proprio_requerimento(client, contexto_triagem):
+    requerente = contexto_triagem["requerente"]
+    requerimento = contexto_triagem["requerimento"]
+    requerente.is_staff = True
+    requerente.is_superuser = True
+    requerente.save(update_fields=["is_staff", "is_superuser"])
+    client.force_login(requerente)
+
+    resposta = client.post(reverse("triagem:iniciar", args=[requerimento.uuid]))
+
+    assert resposta.status_code == 403
+    assert not TriagemRequerimento.objects.filter(requerimento=requerimento).exists()
+
+
+@pytest.mark.django_db
+def test_requerente_nao_acessa_nem_altera_triagem_propria_ja_iniciada(
+    client, contexto_triagem
+):
+    from django.contrib.auth.models import Group
+
+    from apps.cadastros.permissions import seed_groups
+
+    requerimento = contexto_triagem["requerimento"]
+    client.force_login(contexto_triagem["membro"])
+    client.post(reverse("triagem:iniciar", args=[requerimento.uuid]))
+    triagem = TriagemRequerimento.objects.get(requerimento=requerimento)
+
+    seed_groups()
+    requerente = contexto_triagem["requerente"]
+    requerente.groups.add(Group.objects.get(name="Operação de Triagem"))
+    client.force_login(requerente)
+
+    assert client.get(reverse("triagem:detalhe", args=[triagem.uuid])).status_code == 403
+    assert (
+        client.post(
+            reverse("triagem:salvar", args=[triagem.uuid]),
+            post_checklist(triagem),
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            reverse("triagem:concluir", args=[triagem.uuid]),
+            post_checklist(triagem),
+        ).status_code
+        == 403
+    )
+
+    triagem.refresh_from_db()
+    requerimento.refresh_from_db()
+    assert triagem.resultado == TriagemRequerimento.Resultado.EM_ANDAMENTO
+    assert requerimento.situacao == Requerimento.Situacao.EM_TRIAGEM

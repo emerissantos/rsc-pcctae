@@ -1,6 +1,6 @@
 # Sistema RSC-PCCTAE — UFSB
 
-Versão **0.7.2**, com histórico completo de triagem e comunicações no requerimento.
+Versão **0.8.2**, com auditoria transversal de autenticação, acessos, cadastros, requerimentos, documentos e triagens.
 
 ## Escopo desta versão
 
@@ -19,16 +19,19 @@ O sistema foi simplificado para o fluxo operacional do RSC-PCCTAE:
 - revisão e submissão;
 - distribuição automática para a comissão vigente;
 - fila de triagem para membros ativos da comissão;
+- segregação de funções: o requerente nunca atua na triagem, avaliação, relatoria ou deliberação do próprio processo;
 - checklist configurável com histórico por snapshots;
 - devolução para correção com prazo configurável de 10, 30 ou 90 dias;
 - histórico visual das rodadas de triagem, responsáveis, datas, orientações e pendências por item;
 - snapshots da regra usada no lançamento, preservando o histórico;
-- Central de Cadastros com cards por área e visibilidade baseada em permissões;
+- Central de Cadastros com cards por área e acesso exclusivo por perfis funcionais próprios;
 - grids reutilizáveis com pesquisa dinâmica, filtros recolhíveis, ordenação e paginação;
 - perfis operacionais atribuídos pela própria interface, sem dependência cotidiana do Django Admin;
 - importação administrativa de usuários do SIG, sem exigir primeiro login;
 - simulação auditada de usuários em modo somente leitura para suporte técnico;
-- área de auditoria com histórico de importações, simulações e ações bloqueadas;
+- auditoria transversal com autenticação, acessos negados, alterações antes/depois, documentos, requerimentos e triagens;
+- detalhe de cada evento com ator real, usuário afetado, IP, request ID, objeto e comparação dos dados;
+- geração do formulário F-00 em DOCX editável, preenchido com dados funcionais, itens, pontuação e comprovantes;
 - interface responsiva inspirada nas capturas de referência fornecidas.
 
 Não há módulo de normas, versões normativas, matrizes ou ciclos de avaliação.
@@ -110,7 +113,7 @@ Cada requerimento apresenta um bloco **Histórico e comunicações** com as movi
 
 ## Central de Cadastros e perfis de acesso
 
-O menu principal possui somente o item **Cadastros**. A página central distribui os recursos em cards de **Pessoas e acessos**, **Comissões**, **Pontuação**, **Triagem** e **Auditoria e suporte**. Cada card e cada operação são exibidos conforme as permissões do usuário.
+O menu principal possui somente o item **Cadastros**. A página central distribui os recursos em cards de **Pessoas e acessos**, **Comissões**, **Pontuação**, **Triagem** e **Auditoria e suporte**. O item só aparece para usuários vinculados a um perfil funcional próprio da Central de Cadastros. `is_staff`, permissões diretas isoladas e o perfil **Operação de Triagem** não liberam esse módulo.
 
 As listagens compartilham a mesma infraestrutura: pesquisa com atualização dinâmica, filtros avançados recolhidos, ordenação por colunas, paginação, quantidade de linhas por página, badges, estado vazio e formulários em cards. Pesquisa, filtros, ordenação e página permanecem na URL.
 
@@ -125,7 +128,13 @@ Perfis disponíveis:
 - **Gestão de Triagem**;
 - **Consulta de Cadastros**.
 
-A atribuição é feita em **Cadastros → Pessoas e acessos → Usuários**. O perfil administrativo não amplia a tela **Meus requerimentos**: ela continua mostrando exclusivamente os requerimentos do usuário autenticado. As filas de trabalho da comissão permanecem em telas operacionais próprias.
+A atribuição é feita em **Cadastros → Pessoas e acessos → Usuários**. O perfil administrativo não amplia a tela **Meus requerimentos**: ela continua mostrando exclusivamente os requerimentos do usuário autenticado. O perfil **Operação de Triagem** autoriza apenas a fila operacional e não torna a Central de Cadastros visível. As filas de trabalho da comissão permanecem em telas próprias.
+
+Para redefinir uma conta como requerente puro, removendo perfis funcionais, permissões diretas e flags administrativas, execute:
+
+```bash
+docker compose exec web python manage.py configurar_como_requerente LOGIN --confirmar
+```
 
 O Django Admin continua disponível como retaguarda técnica apenas para superusuários.
 
@@ -166,8 +175,8 @@ Os registros ficam disponíveis em **Cadastros → Auditoria e suporte**.
 ### 1. Extraia o projeto
 
 ```bash
-unzip rsc-pcctae-v0.7.2.zip
-cd rsc-pcctae-v0.7.2/rsc-pcctae
+unzip rsc-pcctae-v0.8.0.zip
+cd rsc-pcctae-v0.8.0/rsc-pcctae
 ```
 
 ### 2. Crie o `.env`
